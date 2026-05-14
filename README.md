@@ -1,0 +1,2 @@
+# Synrgy
+HR management tool

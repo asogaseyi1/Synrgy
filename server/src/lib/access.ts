@@ -22,3 +22,14 @@ export async function canReview(db: Queryable, me: AuthContext, userId: string):
   if (atLeast(me.role, 'admin')) return true;
   return me.role === 'manager' && isManagerOf(db, me, userId);
 }
+
+/**
+ * Can `me` create/edit schedule entries for this person (null = open shift)?
+ * Admins: anyone. Managers: open shifts, themselves, and their direct reports.
+ */
+export async function canSchedule(db: Queryable, me: AuthContext, userId: string | null): Promise<boolean> {
+  if (atLeast(me.role, 'admin')) return true;
+  if (me.role !== 'manager') return false;
+  if (userId === null || userId === me.userId) return true;
+  return isManagerOf(db, me, userId);
+}

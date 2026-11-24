@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { api, type ClockStatus, type WorkSession } from '../api.ts';
+import { api, type ClockStatus, type Shift, type WorkSession } from '../api.ts';
 import { useMe } from '../auth.tsx';
 import { clockDuration, date, duration, time } from '../format.ts';
+import { dayKey, formatDay } from '../tz.ts';
 import { errorMessage, useApi } from '../useApi.ts';
 
 function useNow(intervalMs = 1000) {
@@ -22,6 +23,7 @@ export function ClockPage() {
     from.setHours(0, 0, 0, 0);
     return api.get<{ totals: { workedSeconds: number } }>(`/time/sessions?from=${from.toISOString()}`);
   });
+  const upcoming = useApi(() => api.get<{ shifts: Shift[] }>('/shifts/upcoming'));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const now = useNow();
@@ -97,14 +99,29 @@ export function ClockPage() {
         )}
         {(error || status.error) && <p className="error">{error ?? status.error}</p>}
       </div>
-      {today.data && (
-        <div className="stats today">
+      <div className="stats today">
+        {today.data && (
           <div className="stat">
             <span>Worked today</span>
             <strong>{duration(today.data.totals.workedSeconds)}</strong>
           </div>
-        </div>
-      )}
+        )}
+        {upcoming.data && (
+          <Link to="/schedule" className="stat stat-link">
+            <span>{upcoming.data.shifts[0] && Date.parse(upcoming.data.shifts[0].startsAt) <= now ? 'Current shift' : 'Next shift'}</span>
+            {upcoming.data.shifts[0] ? (
+              <strong className="stat-text">
+                {dayKey(upcoming.data.shifts[0].startsAt, tz) === dayKey(new Date(), tz)
+                  ? 'Today'
+                  : formatDay(dayKey(upcoming.data.shifts[0].startsAt, tz))}
+                , {time(upcoming.data.shifts[0].startsAt, tz)}–{time(upcoming.data.shifts[0].endsAt, tz)}
+              </strong>
+            ) : (
+              <strong className="stat-text muted">Nothing scheduled</strong>
+            )}
+          </Link>
+        )}
+      </div>
     </section>
   );
 }

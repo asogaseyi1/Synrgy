@@ -345,7 +345,8 @@ function NewRequestForm() {
 
 export const APPROVALS_CHANGED = 'synrgy:approvals-changed';
 
-export function ApprovalsPage() {
+/** Time-correction queue, embedded in the Approvals page. */
+export function ExceptionApprovals() {
   const { organization } = useMe();
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const { data, error, reload } = useApi(
@@ -371,13 +372,9 @@ export function ApprovalsPage() {
   };
 
   return (
-    <section>
-      <div className="page-head">
-        <div>
-          <p className="eyebrow">Time corrections</p>
-          <h1>Approvals</h1>
-        </div>
-        <div className="tabs" role="tablist">
+    <>
+      <div className="subhead">
+        <div className="tabs small-tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'pending'} className={tab === 'pending' ? 'active' : ''} onClick={() => setTab('pending')}>
             Pending
           </button>
@@ -414,6 +411,6 @@ export function ApprovalsPage() {
           </ExceptionCard>
         ))}
       </div>
-    </section>
+    </>
   );
 }

@@ -44,3 +44,28 @@ export function fromZonedInput(value: string, timeZone: string): string {
   if (corrected !== result) result = corrected;
   return new Date(result).toISOString();
 }
+
+// ---- Calendar-day helpers (dates as "YYYY-MM-DD" in the org time zone) ----
+
+/** The org-local calendar day an instant falls on. */
+export const dayKey = (iso: string | Date, timeZone: string) => toZonedInput(iso, timeZone).slice(0, 10);
+
+export function addDays(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** Monday of the week containing `ymd`. */
+export function mondayOf(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sun
+  return addDays(ymd, -((dow + 6) % 7));
+}
+
+/** Start of an org-local day as an ISO instant. */
+export const startOfDay = (ymd: string, timeZone: string) => fromZonedInput(`${ymd}T00:00`, timeZone);
+
+export function formatDay(ymd: string, opts: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' }) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString([], { ...opts, timeZone: 'UTC' });
+}

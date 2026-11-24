@@ -100,11 +100,20 @@ Each milestone ends with working API + UI + tests and can be shipped on its own.
 - [x] UI: My requests, new request form (times in org time zone), Fix links on the timesheet, Approvals queue with nav badge
 - [ ] Later (M6): make the 16h / 31-day / 24h limits org settings; email the reviewer on new requests
 
-### M3 — Scheduling & shift swaps
-- [ ] Managers create/publish shifts (week view); employees see "My schedule"
-- [ ] Swap flows: **direct swap** (my shift ↔ your shift), **cover** (you take my shift), **open offer** (anyone eligible)
-- [ ] Peer accepts, then a manager approves (org setting: manager approval required yes/no)
-- [ ] Conflict checks (overlap, max hours/week)
+### M3 — Scheduling & shift swaps ✅
+- [x] Managers create/edit/delete shifts in a week grid (org time zone, overnight shifts supported); open/unassigned shifts
+- [x] Draft → publish workflow; employees only ever see published shifts, but see the whole team's published schedule
+- [x] Scope: admins schedule anyone; managers schedule themselves, their direct reports, and open shifts
+- [x] No double-booking, enforced by a Postgres exclusion constraint (`btree_gist`), safe under concurrent writes
+- [x] Swap flows: **swap** (my shift ⇄ yours), **cover** (you take mine), **open offer** (anyone picks it up)
+- [x] Coworker accepts → manager approves (admin or manager of either party; never a party to the swap).
+      Org setting `requireSwapApproval` can make swaps go through on acceptance
+- [x] Conflict checks at request, acceptance and approval: overlap, and optional `maxWeeklyHours` cap (Mon–Sun, org tz)
+- [x] Editing/deleting a shift cancels pending swaps on it; an approved swap cancels other pending requests for the same shifts
+- [x] UI: Schedule grid, trade dialog, Swaps page (asked of you / up for grabs / yours), swap tab on Approvals,
+      admin Settings page, "Next shift" card on the clock page, nav badges
+- [ ] Later: copy last week's schedule, shift templates, employees claiming unassigned open shifts directly,
+      availability/time-off, notifications
 
 ### M4 — Announcements
 - [ ] Admins/managers post announcements targeted to everyone, roles, or specific teams

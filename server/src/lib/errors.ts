@@ -36,6 +36,10 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(err.status).json({ error: { code: err.code, message: err.message, details: err.details } });
     return;
   }
+  if ((err as { code?: string })?.code === '23P01') {
+    res.status(409).json({ error: { code: 'schedule_conflict', message: 'That person already has a shift at that time' } });
+    return;
+  }
   if (isUniqueViolation(err)) {
     res.status(409).json({ error: { code: 'conflict', message: 'That record already exists' } });
     return;

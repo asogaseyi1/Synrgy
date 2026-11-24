@@ -90,7 +90,7 @@ export interface ShiftShape {
   breaks: { startedAt: string; endedAt: string | null; kind: 'paid' | 'unpaid' }[];
 }
 
-interface PersonRef {
+export interface PersonRef {
   id: string;
   firstName: string;
   lastName: string;
@@ -117,4 +117,57 @@ export const EXCEPTION_KIND_LABELS: Record<ExceptionKind, string> = {
   missed_clock_out: 'Missed clock-out',
   missed_break: 'Missed break',
   wrong_time: 'Wrong time',
+};
+
+export interface OrgSettings {
+  requireSwapApproval: boolean;
+  maxWeeklyHours: number | null;
+}
+
+export interface Shift {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  position: string | null;
+  location: string | null;
+  notes: string | null;
+  isDraft: boolean;
+  user: PersonRef | null;
+  activeSwap: { id: string; type: SwapType; status: SwapStatus } | null;
+}
+
+export type SwapType = 'swap' | 'cover' | 'open';
+export type SwapStatus = 'pending_peer' | 'pending_manager' | 'approved' | 'declined' | 'rejected' | 'cancelled';
+
+type ShiftRef = Pick<Shift, 'id' | 'startsAt' | 'endsAt' | 'position' | 'location'>;
+
+export interface Swap {
+  id: string;
+  type: SwapType;
+  status: SwapStatus;
+  message: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  shift: ShiftRef;
+  targetShift: ShiftRef | null;
+  requester: PersonRef;
+  targetUser: PersonRef | null;
+  acceptedBy: PersonRef | null;
+  reviewer: PersonRef | null;
+}
+
+export const SWAP_STATUS_LABELS: Record<SwapStatus, string> = {
+  pending_peer: 'Waiting for coworker',
+  pending_manager: 'Waiting for manager',
+  approved: 'Approved',
+  declined: 'Declined',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+};
+
+export const SWAP_TYPE_LABELS: Record<SwapType, string> = {
+  swap: 'Shift swap',
+  cover: 'Cover request',
+  open: 'Open offer',
 };

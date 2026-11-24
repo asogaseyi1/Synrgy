@@ -1,0 +1,168 @@
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { api, type Me, type Organization, type User } from '../api.ts';
+import { useAuth } from '../auth.tsx';
+import { errorMessage, useApi } from '../useApi.ts';
+
+function formData(e: FormEvent<HTMLFormElement>) {
+  return Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+}
+
+function useSubmit(action: (values: Record<string, string>) => Promise<void>) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await action(formData(e));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { error, busy, onSubmit };
+}
+
+export function LoginPage() {
+  const { setMe } = useAuth();
+  const navigate = useNavigate();
+  const { error, busy, onSubmit } = useSubmit(async (v) => {
+    setMe(await api.post<Me>('/auth/login', v));
+    navigate('/');
+  });
+
+  return (
+    <main className="auth-card">
+      <h1>Sign in to Synrgy</h1>
+      <form onSubmit={onSubmit}>
+        <label>
+          Workspace
+          <input name="workspace" required autoComplete="organization" placeholder="acme" />
+        </label>
+        <label>
+          Email
+          <input name="email" type="email" required autoComplete="email" />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" required autoComplete="current-password" />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button disabled={busy}>Sign in</button>
+      </form>
+      <p className="muted">
+        New company? <Link to="/register">Create a workspace</Link>
+      </p>
+    </main>
+  );
+}
+
+export function RegisterPage() {
+  const { refresh } = useAuth();
+  const navigate = useNavigate();
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [slug, setSlug] = useState('');
+  const { error, busy, onSubmit } = useSubmit(async (v) => {
+    await api.post<{ organization: Organization; user: User }>('/auth/register-organization', v);
+    await refresh();
+    navigate('/');
+  });
+
+  return (
+    <main className="auth-card">
+      <h1>Create your workspace</h1>
+      <form onSubmit={onSubmit}>
+        <label>
+          Company name
+          <input
+            name="organizationName"
+            required
+            onChange={(e) =>
+              setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40))
+            }
+          />
+        </label>
+        <label>
+          Workspace ID <span className="muted">(used to sign in)</span>
+          <input name="slug" required value={slug} onChange={(e) => setSlug(e.target.value)} />
+        </label>
+        <label>
+          Time zone
+          <input name="timezone" required defaultValue={browserTz} />
+        </label>
+        <div className="row">
+          <label>
+            First name
+            <input name="firstName" required />
+          </label>
+          <label>
+            Last name
+            <input name="lastName" required />
+          </label>
+        </div>
+        <label>
+          Work email
+          <input name="email" type="email" required />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" minLength={8} required autoComplete="new-password" />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button disabled={busy}>Create workspace</button>
+      </form>
+      <p className="muted">
+        Already have one? <Link to="/login">Sign in</Link>
+      </p>
+    </main>
+  );
+}
+
+export function AcceptInvitePage() {
+  const { token = '' } = useParams();
+  const { refresh } = useAuth();
+  const navigate = useNavigate();
+  const { data, error: loadError } = useApi(
+    () => api.get<{ invitation: { email: string; role: string; organizationName: string } }>(`/invitations/${token}`),
+    [token],
+  );
+  const { error, busy, onSubmit } = useSubmit(async (v) => {
+    await api.post(`/invitations/${token}/accept`, v);
+    await refresh();
+    navigate('/');
+  });
+
+  if (loadError) return <main className="auth-card"><p className="error">{loadError}</p></main>;
+  if (!data) return <main className="auth-card">Loading…</main>;
+  const inv = data.invitation;
+
+  return (
+    <main className="auth-card">
+      <h1>Join {inv.organizationName}</h1>
+      <p className="muted">
+        You were invited as <strong>{inv.role}</strong> ({inv.email}).
+      </p>
+      <form onSubmit={onSubmit}>
+        <div className="row">
+          <label>
+            First name
+            <input name="firstName" required />
+          </label>
+          <label>
+            Last name
+            <input name="lastName" required />
+          </label>
+        </div>
+        <label>
+          Choose a password
+          <input name="password" type="password" minLength={8} required autoComplete="new-password" />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button disabled={busy}>Join</button>
+      </form>
+    </main>
+  );
+}

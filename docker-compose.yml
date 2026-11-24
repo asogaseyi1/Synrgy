@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: synrgy
+      POSTGRES_PASSWORD: synrgy
+      POSTGRES_DB: synrgy
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synrgy"]
+      interval: 2s
+      retries: 20
+volumes:
+  pgdata:

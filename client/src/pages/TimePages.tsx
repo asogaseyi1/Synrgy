@@ -45,25 +45,33 @@ export function TimesheetPage() {
         <h1>{userId ? 'Timesheet' : 'My timesheet'}</h1>
         <RangePicker value={range} onChange={setRange} />
       </div>
-      {userId && <Link to="/team">← Back to team</Link>}
+      {userId ? (
+        <p>
+          <Link to="/team">← Back to team</Link>
+        </p>
+      ) : (
+        <p className="muted">
+          Something wrong? Click <strong>Fix</strong> on a shift, or <Link to="/requests/new">report a missed shift</Link>.
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
       {data && (
         <>
           <div className="stats">
-            <div>
-              <span className="muted">Worked</span>
+            <div className="stat accent">
+              <span>Worked</span>
               <strong>{duration(data.totals.workedSeconds)}</strong>
             </div>
-            <div>
-              <span className="muted">Breaks</span>
+            <div className="stat">
+              <span>Breaks</span>
               <strong>{duration(data.totals.breakSeconds)}</strong>
             </div>
-            <div>
-              <span className="muted">Shifts</span>
+            <div className="stat">
+              <span>Shifts</span>
               <strong>{data.sessions.length}</strong>
             </div>
           </div>
-          <SessionsTable sessions={data.sessions} timeZone={organization.timezone} />
+          <SessionsTable sessions={data.sessions} timeZone={organization.timezone} canFix={!userId} />
         </>
       )}
     </section>
@@ -92,7 +100,7 @@ export function TeamPage() {
         <RangePicker value={range} onChange={setRange} />
       </div>
       {error && <p className="error">{error}</p>}
-      {data && !data.members.length && <p className="muted">No direct reports yet.</p>}
+      {data && !data.members.length && <p className="empty">No direct reports yet. Admins can assign managers on the People page.</p>}
       {data && data.members.length > 0 && (
         <div className="table-wrap">
           <table>

@@ -5,6 +5,7 @@ import { errorHandler, notFound } from './lib/errors.ts';
 import { loadSession, requireAuth } from './middleware/auth.ts';
 import { authRouter } from './routes/auth.ts';
 import { invitationsRouter, membersRouter } from './routes/members.ts';
+import { exceptionsRouter } from './routes/exceptions.ts';
 import { timeRouter } from './routes/time.ts';
 
 export function createApp() {
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/api/invitations', invitationsRouter);
   app.use('/api/members', requireAuth, membersRouter);
   app.use('/api/time', requireAuth, timeRouter);
+  app.use('/api/exceptions', requireAuth, exceptionsRouter);
 
   app.use('/api', () => {
     throw notFound('No such endpoint');

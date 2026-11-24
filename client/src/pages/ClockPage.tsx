@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { api, type ClockStatus, type WorkSession } from '../api.ts';
 import { useMe } from '../auth.tsx';
 import { clockDuration, date, duration, time } from '../format.ts';
@@ -45,21 +46,37 @@ export function ClockPage() {
 
   return (
     <section>
+      <p className="eyebrow">{new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       <h1>Hi, {user.firstName}</h1>
+      {s?.stale && s.session && (
+        <div className="banner">
+          <div>
+            <strong>Did you forget to clock out?</strong>
+            <div className="small">
+              You've been clocked in since {date(s.session.clockInAt, tz)} at {time(s.session.clockInAt, tz)}.
+            </div>
+          </div>
+          <Link className="button" to={`/requests/new?session=${s.session.id}&kind=missed_clock_out`}>
+            Fix this shift
+          </Link>
+        </div>
+      )}
       <div className={`clock-card state-${s?.state ?? 'off'}`}>
         {!s ? (
           <p>Loading…</p>
         ) : s.state === 'off' ? (
           <>
-            <p className="state-label">You're clocked out</p>
+            <span className="status-pill">Clocked out</span>
+            <p className="state-label">Ready to start your shift?</p>
             <button className="big" disabled={busy} onClick={() => act('/time/clock-in')}>
               Clock in
             </button>
           </>
         ) : (
           <>
+            <span className="status-pill">{s.state === 'on_break' ? 'On break' : 'Working'}</span>
             <p className="state-label">
-              {s.state === 'on_break' ? 'On break' : 'Working'} · clocked in at {time(s.session!.clockInAt, tz)}
+              {s.state === 'on_break' ? 'Break time' : 'Shift time'} · clocked in at {time(s.session!.clockInAt, tz)}
             </p>
             <p className="timer">{clockDuration(s.state === 'on_break' ? sinceBreak : sinceIn)}</p>
             <div className="actions">
@@ -72,7 +89,7 @@ export function ClockPage() {
                   End break
                 </button>
               )}
-              <button disabled={busy} className="danger" onClick={() => act('/time/clock-out')}>
+              <button disabled={busy} className="complement" onClick={() => act('/time/clock-out')}>
                 Clock out
               </button>
             </div>
@@ -80,13 +97,28 @@ export function ClockPage() {
         )}
         {(error || status.error) && <p className="error">{error ?? status.error}</p>}
       </div>
-      {today.data && <p className="muted">Worked today: {duration(today.data.totals.workedSeconds)}</p>}
+      {today.data && (
+        <div className="stats today">
+          <div className="stat">
+            <span>Worked today</span>
+            <strong>{duration(today.data.totals.workedSeconds)}</strong>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-export function SessionsTable({ sessions, timeZone }: { sessions: WorkSession[]; timeZone: string }) {
-  if (!sessions.length) return <p className="muted">No time recorded in this period.</p>;
+export function SessionsTable({
+  sessions,
+  timeZone,
+  canFix = false,
+}: {
+  sessions: WorkSession[];
+  timeZone: string;
+  canFix?: boolean;
+}) {
+  if (!sessions.length) return <p className="empty">No time recorded in this period.</p>;
   return (
     <div className="table-wrap">
       <table>
@@ -97,6 +129,7 @@ export function SessionsTable({ sessions, timeZone }: { sessions: WorkSession[];
             <th>Out</th>
             <th>Breaks</th>
             <th className="num">Worked</th>
+            <th />
           </tr>
         </thead>
         <tbody>
@@ -107,6 +140,16 @@ export function SessionsTable({ sessions, timeZone }: { sessions: WorkSession[];
               <td>{s.clockOutAt ? time(s.clockOutAt, timeZone) : <span className="badge">open</span>}</td>
               <td>{s.breaks.length ? duration(s.unpaidBreakSeconds + s.paidBreakSeconds) : '—'}</td>
               <td className="num">{duration(s.workedSeconds)}</td>
+              <td className="row-actions">
+                {s.pendingExceptionId ? (
+                  <span className="badge">Correction pending</span>
+                ) : (
+                  <>
+                    {s.source === 'correction' && <span className="badge edited">Edited</span>}
+                    {canFix && <Link to={`/requests/new?session=${s.id}`}>Fix</Link>}
+                  </>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

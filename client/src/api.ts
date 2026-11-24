@@ -62,12 +62,16 @@ export interface ClockStatus {
   state: 'off' | 'working' | 'on_break';
   session: { id: string; clockInAt: string } | null;
   break: { id: string; startedAt: string; kind: 'paid' | 'unpaid' } | null;
+  /** Open long enough that it was probably a forgotten clock-out. */
+  stale: boolean;
 }
 
 export interface WorkSession {
   id: string;
   clockInAt: string;
   clockOutAt: string | null;
+  source: 'clock' | 'correction' | 'manual';
+  pendingExceptionId: string | null;
   breaks: { id: string; startedAt: string; endedAt: string | null; kind: 'paid' | 'unpaid' }[];
   workedSeconds: number;
   unpaidBreakSeconds: number;
@@ -76,3 +80,41 @@ export interface WorkSession {
 
 const RANK: Record<Role, number> = { employee: 0, manager: 1, admin: 2, owner: 3 };
 export const atLeast = (role: Role, min: Role) => RANK[role] >= RANK[min];
+
+export type ExceptionKind = 'missed_shift' | 'missed_clock_in' | 'missed_clock_out' | 'missed_break' | 'wrong_time';
+export type ExceptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface ShiftShape {
+  clockInAt: string;
+  clockOutAt: string | null;
+  breaks: { startedAt: string; endedAt: string | null; kind: 'paid' | 'unpaid' }[];
+}
+
+interface PersonRef {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface PunchException {
+  id: string;
+  kind: ExceptionKind;
+  status: ExceptionStatus;
+  reason: string;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  workSessionId: string | null;
+  original: ShiftShape | null;
+  requested: ShiftShape;
+  user: PersonRef;
+  reviewer: PersonRef | null;
+}
+
+export const EXCEPTION_KIND_LABELS: Record<ExceptionKind, string> = {
+  missed_shift: 'Missed shift',
+  missed_clock_in: 'Missed clock-in',
+  missed_clock_out: 'Missed clock-out',
+  missed_break: 'Missed break',
+  wrong_time: 'Wrong time',
+};

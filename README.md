@@ -11,8 +11,8 @@ See **[docs/PLAN.md](docs/PLAN.md)** for the architecture, data model and milest
 |---|---|
 | M0 Foundation: workspaces, auth, roles, invites | ✅ |
 | M1 Time clock: clock in/out, breaks, timesheets, team view | ✅ |
-| M2 Missed-punch exceptions | next |
-| M3 Scheduling & shift swaps | planned |
+| M2 Missed-punch exceptions: requests, approvals, audit trail | ✅ |
+| M3 Scheduling & shift swaps | next |
 | M4 Announcements | planned |
 | M5 Anonymous reporting | planned |
 
@@ -48,12 +48,12 @@ server/
   src/
     app.ts         Express app wiring
     middleware/    session auth + role checks
-    routes/        auth, members/invitations, time clock
+    routes/        auth, members/invitations, time clock, exceptions
     lib/           errors, tokens, audit log
   test/            Vitest + Supertest against real Postgres
 client/
   src/
-    pages/         Auth, Clock, Timesheet/Team, People
+    pages/         Auth, Clock, Timesheet/Team, People, Requests/Approvals
     api.ts         typed fetch wrapper
     auth.tsx       session context
 docs/PLAN.md       roadmap

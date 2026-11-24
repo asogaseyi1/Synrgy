@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api, type Me, type Organization, type User } from '../api.ts';
 import { useAuth } from '../auth.tsx';
+import { Brand } from '../Brand.tsx';
 import { errorMessage, useApi } from '../useApi.ts';
 
 function formData(e: FormEvent<HTMLFormElement>) {
@@ -35,8 +36,11 @@ export function LoginPage() {
   });
 
   return (
-    <main className="auth-card">
-      <h1>Sign in to Synrgy</h1>
+    <main className="auth-page">
+      <div className="auth-card">
+      <Brand />
+      <h1>Welcome back</h1>
+      <p className="subtitle">Sign in to your workspace.</p>
       <form onSubmit={onSubmit}>
         <label>
           Workspace
@@ -53,9 +57,10 @@ export function LoginPage() {
         {error && <p className="error">{error}</p>}
         <button disabled={busy}>Sign in</button>
       </form>
-      <p className="muted">
+      <p className="footer">
         New company? <Link to="/register">Create a workspace</Link>
       </p>
+      </div>
     </main>
   );
 }
@@ -72,8 +77,11 @@ export function RegisterPage() {
   });
 
   return (
-    <main className="auth-card">
+    <main className="auth-page">
+      <div className="auth-card">
+      <Brand />
       <h1>Create your workspace</h1>
+      <p className="subtitle">Set up Synrgy for your team in under a minute.</p>
       <form onSubmit={onSubmit}>
         <label>
           Company name
@@ -114,9 +122,10 @@ export function RegisterPage() {
         {error && <p className="error">{error}</p>}
         <button disabled={busy}>Create workspace</button>
       </form>
-      <p className="muted">
+      <p className="footer">
         Already have one? <Link to="/login">Sign in</Link>
       </p>
+      </div>
     </main>
   );
 }
@@ -135,14 +144,24 @@ export function AcceptInvitePage() {
     navigate('/');
   });
 
-  if (loadError) return <main className="auth-card"><p className="error">{loadError}</p></main>;
-  if (!data) return <main className="auth-card">Loading…</main>;
+  if (loadError)
+    return (
+      <main className="auth-page">
+        <div className="auth-card">
+          <Brand />
+          <p className="error">{loadError}</p>
+        </div>
+      </main>
+    );
+  if (!data) return <p className="loading">Loading…</p>;
   const inv = data.invitation;
 
   return (
-    <main className="auth-card">
+    <main className="auth-page">
+      <div className="auth-card">
+      <Brand />
       <h1>Join {inv.organizationName}</h1>
-      <p className="muted">
+      <p className="subtitle">
         You were invited as <strong>{inv.role}</strong> ({inv.email}).
       </p>
       <form onSubmit={onSubmit}>
@@ -163,6 +182,7 @@ export function AcceptInvitePage() {
         {error && <p className="error">{error}</p>}
         <button disabled={busy}>Join</button>
       </form>
+      </div>
     </main>
   );
 }

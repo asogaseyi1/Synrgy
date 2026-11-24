@@ -88,11 +88,17 @@ Each milestone ends with working API + UI + tests and can be shipped on its own.
 - [x] Manager view: team timesheets
 - [x] UI: big clock button, live timer, timesheet table
 
-### M2 — Missed-punch exceptions
-- [ ] Employee submits an exception (missed clock-in/out, missed break, wrong time) with a reason
-- [ ] Manager approve/reject with a note; approval applies the correction to `work_sessions`/`breaks` in a transaction
-- [ ] Audit log entry for every correction (before/after)
-- [ ] Auto-flag sessions left open past N hours (org setting) and prompt the employee to file an exception
+### M2 — Missed-punch exceptions ✅
+- [x] Employee submits an exception (missed shift, missed clock-in/out, missed break, wrong time) with a reason.
+      A request carries the full corrected shift (in, out, breaks) and the server saves a copy of the shift as it was when filed.
+- [x] Validation: out after in, nothing in the future, max 31 days back, max 24h shift, breaks inside the shift and not overlapping,
+      no overlap with other shifts, one pending request per shift
+- [x] Manager (direct reports) or admin approves/rejects; nobody reviews their own; reject requires a note.
+      Approval rewrites `work_sessions`/`breaks` in one transaction, marked `source = 'correction'`
+- [x] Audit log entry for every correction (before/after) and rejection
+- [x] Sessions open > 16h are flagged as `stale`; the clock page prompts the employee to file a correction
+- [x] UI: My requests, new request form (times in org time zone), Fix links on the timesheet, Approvals queue with nav badge
+- [ ] Later (M6): make the 16h / 31-day / 24h limits org settings; email the reviewer on new requests
 
 ### M3 — Scheduling & shift swaps
 - [ ] Managers create/publish shifts (week view); employees see "My schedule"

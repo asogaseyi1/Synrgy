@@ -2,9 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool, tx, isUniqueViolation, type Queryable } from '../db.ts';
 import { badRequest, conflict, forbidden, parse } from '../lib/errors.ts';
-import { atLeast, auth, requireRole, type AuthContext } from '../middleware/auth.ts';
+import { canViewTime } from '../lib/access.ts';
+import { atLeast, auth, requireRole } from '../middleware/auth.ts';
 
 export const timeRouter = Router();
+
+/** An open session older than this is probably a forgotten clock-out. Becomes an org setting in M6. */
+export const STALE_OPEN_HOURS = 16;
 
 /** Current clock state: off, working, or on break. */
 async function getStatus(db: Queryable, userId: string) {
@@ -17,10 +21,11 @@ async function getStatus(db: Queryable, userId: string) {
     [userId],
   );
   const row = rows[0];
-  if (!row) return { state: 'off' as const, session: null, break: null };
+  if (!row) return { state: 'off' as const, session: null, break: null, stale: false };
   return {
     state: row.breakId ? ('on_break' as const) : ('working' as const),
     session: { id: row.id, clockInAt: row.clockInAt },
+    stale: Date.now() - new Date(row.clockInAt).getTime() > STALE_OPEN_HOURS * 3_600_000,
     break: row.breakId ? { id: row.breakId, startedAt: row.breakStartedAt, kind: row.breakKind } : null,
   };
 }
@@ -113,19 +118,6 @@ const rangeSchema = z
   .refine((r) => r.from < r.to, 'from must be before to')
   .refine((r) => r.to.getTime() - r.from.getTime() <= MAX_RANGE_DAYS * 86_400_000, `Range can be at most ${MAX_RANGE_DAYS} days`);
 
-/** Self, admins/owners for anyone in the org, managers for their direct reports. */
-async function assertCanView(me: AuthContext, userId: string) {
-  if (userId === me.userId || atLeast(me.role, 'admin')) return;
-  if (me.role === 'manager') {
-    const { rowCount } = await pool.query(
-      'SELECT 1 FROM users WHERE id = $1 AND organization_id = $2 AND manager_id = $3',
-      [userId, me.organizationId, me.userId],
-    );
-    if (rowCount) return;
-  }
-  throw forbidden("You can't view this person's time");
-}
-
 const SESSION_TOTALS = `
   EXTRACT(EPOCH FROM COALESCE(ws.clock_out_at, now()) - ws.clock_in_at)::int AS "totalSeconds",
   COALESCE(SUM(EXTRACT(EPOCH FROM COALESCE(b.ended_at, now()) - b.started_at))
@@ -137,13 +129,15 @@ timeRouter.get('/sessions', async (req, res) => {
   const me = auth(req);
   const range = parse(rangeSchema, req.query);
   const userId = range.userId ?? me.userId;
-  await assertCanView(me, userId);
+  if (!(await canViewTime(pool, me, userId))) throw forbidden("You can't view this person's time");
 
   const { rows } = await pool.query(
     `SELECT ws.id, ws.clock_in_at AS "clockInAt", ws.clock_out_at AS "clockOutAt", ws.source, ws.notes,
             COALESCE(json_agg(json_build_object(
               'id', b.id, 'startedAt', b.started_at, 'endedAt', b.ended_at, 'kind', b.kind)
               ORDER BY b.started_at) FILTER (WHERE b.id IS NOT NULL), '[]') AS breaks,
+            (SELECT pe.id FROM punch_exceptions pe
+              WHERE pe.work_session_id = ws.id AND pe.status = 'pending') AS "pendingExceptionId",
             ${SESSION_TOTALS}
        FROM work_sessions ws LEFT JOIN breaks b ON b.work_session_id = ws.id
       WHERE ws.organization_id = $1 AND ws.user_id = $2 AND ws.clock_in_at >= $3 AND ws.clock_in_at < $4

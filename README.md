@@ -16,7 +16,7 @@ See **[docs/PLAN.md](docs/PLAN.md)** for the architecture, data model and milest
 | M4 Announcements: targeting, pinning, scheduling/expiry, read receipts, acknowledgements | ✅ |
 | M5 Anonymous reporting: public form, code + key follow-up, reviewer inbox, audited access | ✅ |
 | M6 Making it generic: pay rules & payroll export, departments/locations, email, password reset, rate limiting, CSRF | ✅ |
-| M7 Production readiness: CI, Docker, logging, PWA | next |
+| M7 Production readiness: CI, Docker image, structured logging, health checks, accessibility, installable PWA | ✅ |
 
 ## Getting started
 
@@ -43,22 +43,38 @@ other than `CLIENT_ORIGIN` (e.g. Vite picked another port), set `APP_URL` so ema
 | `npm test` | API integration tests (needs `npm run db:up`) |
 | `npm run typecheck` | Typecheck server and client |
 | `npm run migrate` | Apply new SQL migrations in `server/migrations` |
+| `npm run build -w client` | Production build of the web app (`client/dist`) |
+| `docker compose --profile app up --build` | Run the production image locally on http://localhost:8080 |
+
+## Deploying
+
+One Docker image serves the API and the web app; it needs PostgreSQL. See
+**[docs/OPERATIONS.md](docs/OPERATIONS.md)** for configuration, health checks, logging (including keeping proxies
+from logging anonymous-report traffic), backups and a security checklist. CI runs on every push and pull request
+(`.github/workflows/ci.yml`).
 
 ## Layout
 
 ```
 server/
-  migrations/      SQL migrations, applied in order
+  migrations/      SQL migrations, applied in order (under an advisory lock)
   src/
-    app.ts         Express app wiring
-    middleware/    session auth + role checks
-    routes/        auth, members, time clock, exceptions, shifts, swaps, organization
-    lib/           errors, tokens, audit log
+    app.ts         Express app wiring, static hosting of the built client
+    index.ts       entrypoint: migrations, jobs, graceful shutdown
+    middleware/    session auth, role checks, rate limiting, CSRF
+    routes/        auth, members, time & payroll, exceptions, shifts, swaps, announcements,
+                   reports (public + reviewer), organization
+    lib/           payroll rules, mailer + notifications, jobs, logger, settings, audit log
   test/            Vitest + Supertest against real Postgres
 client/
+  public/          PWA manifest, service worker, icons (scripts/make-icons.ts regenerates them)
   src/
-    pages/         Auth, Clock, Schedule, Swaps, Timesheet/Team, Requests, Approvals, People, Settings
+    pages/         one file per area
     api.ts         typed fetch wrapper
     auth.tsx       session context
-docs/PLAN.md       roadmap
+    a11y.ts        focus management, online status
+docs/
+  PLAN.md          architecture, data model, milestones
+  OPERATIONS.md    running it in production
+Dockerfile
 ```

@@ -142,7 +142,7 @@ function ReportFormPage() {
     return (
       <Shell>
         <h1>Workspace not found</h1>
-        <p className="error">{error}</p>
+        <p className="error" role="alert">{error}</p>
       </Shell>
     );
   }
@@ -193,7 +193,7 @@ function ReportFormPage() {
           Who was involved? <span className="muted">(optional)</span>
           <input name="peopleInvolved" maxLength={500} placeholder="Names or roles of the people involved or who witnessed it" />
         </label>
-        {submitError && <p className="error">{submitError}</p>}
+        {submitError && <p className="error" role="alert">{submitError}</p>}
         <button type="submit" disabled={busy}>
           {busy ? 'Sending…' : 'Submit anonymously'}
         </button>
@@ -309,7 +309,7 @@ function ReportStatusPage() {
     return (
       <Shell>
         <h1>Workspace not found</h1>
-        <p className="error">{error}</p>
+        <p className="error" role="alert">{error}</p>
       </Shell>
     );
   }
@@ -328,7 +328,7 @@ function ReportStatusPage() {
             Secret key
             <input name="accessKey" type="password" required placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" spellCheck={false} className="mono" />
           </label>
-          {formError && <p className="error">{formError}</p>}
+          {formError && <p className="error" role="alert">{formError}</p>}
           <button type="submit" disabled={busy}>
             View my report
           </button>
@@ -391,7 +391,7 @@ function ReportStatusPage() {
             Reply anonymously
             <textarea rows={4} value={reply} required maxLength={5000} onChange={(e) => setReply(e.target.value)} />
           </label>
-          {formError && <p className="error">{formError}</p>}
+          {formError && <p className="error" role="alert">{formError}</p>}
           <button type="submit" disabled={busy || !reply.trim()}>
             Send reply
           </button>

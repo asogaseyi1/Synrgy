@@ -54,7 +54,7 @@ export function TimesheetPage() {
           Something wrong? Click <strong>Fix</strong> on a shift, or <Link to="/requests/new">report a missed shift</Link>.
         </p>
       )}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && (
         <>
           <div className="stats">
@@ -99,7 +99,7 @@ export function TeamPage() {
         <h1>Team time</h1>
         <RangePicker value={range} onChange={setRange} />
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && !data.members.length && <p className="empty">No direct reports yet. Admins can assign managers on the People page.</p>}
       {data && data.members.length > 0 && (
         <div className="table-wrap">

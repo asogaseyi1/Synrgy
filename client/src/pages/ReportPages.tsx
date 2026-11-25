@@ -117,7 +117,7 @@ export function ReportsInboxPage() {
         Reports are anonymous. Opening one is recorded in its access log, which every reviewer can see. Please don't try to
         identify the reporter.
       </p>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && data.reports.length === 0 && <p className="empty">No {filter === 'all' ? '' : filter} reports.</p>}
       {data && data.reports.length > 0 && (
         <div className="table-wrap">
@@ -194,7 +194,7 @@ export function ReportDetailPage() {
     if (await act(() => api.post(`/reports/${reportId}/messages`, { body: reply }))) setReply('');
   };
 
-  if (error) return <p className="error">{error}</p>;
+  if (error) return <p className="error" role="alert">{error}</p>;
   if (!r) return <p className="loading">Loading…</p>;
 
   return (
@@ -219,7 +219,7 @@ export function ReportDetailPage() {
           </select>
         </label>
       </div>
-      {actionError && <p className="error">{actionError}</p>}
+      {actionError && <p className="error" role="alert">{actionError}</p>}
 
       <article className="card">
         <div className="kv small report-facts">

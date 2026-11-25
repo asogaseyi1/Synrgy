@@ -54,7 +54,7 @@ export function LoginPage() {
           Password
           <input name="password" type="password" required autoComplete="current-password" />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <button disabled={busy}>Sign in</button>
       </form>
       <p className="footer">
@@ -121,7 +121,7 @@ export function RegisterPage() {
           Password
           <input name="password" type="password" minLength={8} required autoComplete="new-password" />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <button disabled={busy}>Create workspace</button>
       </form>
       <p className="footer">
@@ -151,7 +151,7 @@ export function AcceptInvitePage() {
       <main className="auth-page">
         <div className="auth-card">
           <Brand />
-          <p className="error">{loadError}</p>
+          <p className="error" role="alert">{loadError}</p>
         </div>
       </main>
     );
@@ -181,7 +181,7 @@ export function AcceptInvitePage() {
           Choose a password
           <input name="password" type="password" minLength={8} required autoComplete="new-password" />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <button disabled={busy}>Join</button>
       </form>
       </div>
@@ -218,7 +218,7 @@ export function ForgotPasswordPage() {
                 Email
                 <input name="email" type="email" required autoComplete="email" />
               </label>
-              {error && <p className="error">{error}</p>}
+              {error && <p className="error" role="alert">{error}</p>}
               <button disabled={busy}>Send reset link</button>
             </form>
           </>
@@ -252,7 +252,7 @@ export function ResetPasswordPage() {
         {loadError ? (
           <>
             <h1>Link expired</h1>
-            <p className="error">{loadError}</p>
+            <p className="error" role="alert">{loadError}</p>
             <p className="footer">
               <Link to="/forgot">Request a new link</Link>
             </p>
@@ -274,7 +274,7 @@ export function ResetPasswordPage() {
                 Confirm new password
                 <input name="confirm" type="password" minLength={8} required autoComplete="new-password" />
               </label>
-              {error && <p className="error">{error}</p>}
+              {error && <p className="error" role="alert">{error}</p>}
               <button disabled={busy}>Save password and sign in</button>
             </form>
           </>

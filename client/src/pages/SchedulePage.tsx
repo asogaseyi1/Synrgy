@@ -115,7 +115,7 @@ export function SchedulePage() {
           : <>You're scheduled for <strong>{duration(myHours)}</strong> this week. Click one of your upcoming shifts to swap it or ask for cover. See <Link to="/swaps">Swaps</Link> for requests.</>}
       </p>
       {publishMsg && <p className="notice">{publishMsg}</p>}
-      {(shifts.error || members.error) && <p className="error">{shifts.error ?? members.error}</p>}
+      {(shifts.error || members.error) && <p className="error" role="alert">{shifts.error ?? members.error}</p>}
 
       <div className="schedule-wrap">
         <table className="schedule">
@@ -310,7 +310,7 @@ function ShiftEditor({
           <input value={notes} maxLength={500} onChange={(e) => setNotes(e.target.value)} />
         </label>
         {shift?.activeSwap && <p className="notice small">Saving will cancel the pending swap request on this shift.</p>}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <div className="card-actions">
           {shift && (
             <button type="button" className="link danger-link" onClick={() => void remove()}>
@@ -438,7 +438,7 @@ function SwapRequestDialog({ shift, tz, onClose, onDone }: { shift: Shift; tz: s
           Message <span className="muted">(optional)</span>
           <input value={message} maxLength={500} placeholder="e.g. Family event that evening" onChange={(e) => setMessage(e.target.value)} />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <div className="card-actions">
           <button type="button" className="secondary" onClick={onClose}>
             Cancel

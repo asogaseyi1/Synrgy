@@ -138,7 +138,7 @@ export function MyRequestsPage() {
       <p className="muted">
         To fix a shift that's already on your timesheet, use <Link to="/timesheet">Fix</Link> next to it.
       </p>
-      {(error || actionError) && <p className="error">{error ?? actionError}</p>}
+      {(error || actionError) && <p className="error" role="alert">{error ?? actionError}</p>}
       {data && !data.exceptions.length && <p className="empty">You haven't filed any corrections.</p>}
       <div className="card-list">
         {data?.exceptions.map((ex) => (
@@ -247,7 +247,7 @@ function NewRequestForm() {
     }
   };
 
-  if (loadError) return <p className="error">{loadError}</p>;
+  if (loadError) return <p className="error" role="alert">{loadError}</p>;
   if (sessionId && !session) return <p className="loading">Loading…</p>;
 
   const maxInput = toZonedInput(new Date(), tz);
@@ -330,7 +330,7 @@ function NewRequestForm() {
             onChange={(e) => setReason(e.target.value)}
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <div className="card-actions">
           <Link to={sessionId ? '/timesheet' : '/requests'}>Cancel</Link>
           <button disabled={busy}>Submit for approval</button>
@@ -383,7 +383,7 @@ export function ExceptionApprovals() {
           </button>
         </div>
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && !data.exceptions.length && (
         <p className="empty">{tab === 'pending' ? 'All caught up — nothing waiting for review.' : 'No requests yet.'}</p>
       )}
@@ -405,7 +405,7 @@ export function ExceptionApprovals() {
                     Approve
                   </button>
                 </div>
-                {cardErrors[ex.id] && <p className="error">{cardErrors[ex.id]}</p>}
+                {cardErrors[ex.id] && <p className="error" role="alert">{cardErrors[ex.id]}</p>}
               </div>
             )}
           </ExceptionCard>

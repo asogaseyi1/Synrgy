@@ -138,7 +138,7 @@ export function PayrollPage() {
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && (
         <>
           <p className="muted small">

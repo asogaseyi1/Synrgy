@@ -7,6 +7,7 @@ import { isUniqueViolation, pool, tx, type Queryable } from '../db.ts';
 import { audit } from '../lib/audit.ts';
 import { badRequest, errorHandler, forbidden, HttpError, notFound, parse } from '../lib/errors.ts';
 import { DEFAULT_REPORT_CATEGORIES } from '../lib/settings.ts';
+import { log } from '../lib/logger.ts';
 import { auth } from '../middleware/auth.ts';
 
 /*
@@ -194,7 +195,7 @@ publicReportsRouter.post('/messages', async (req, res) => {
 /** Never log anything about the request on these routes, not even the error detail (pg detail can echo values). */
 const scrubbedErrors: ErrorRequestHandler = (err, req, res, next) => {
   if (err instanceof HttpError || err?.type === 'entity.parse.failed') return errorHandler(err, req, res, next);
-  console.error(`[reports] internal error (${err?.code ?? err?.name ?? 'unknown'})`);
+  log.error('report route error', { code: err?.code ?? err?.name ?? 'unknown' }); // no path, no detail
   res.status(500).json({ error: { code: 'internal', message: 'Something went wrong' } });
 };
 publicReportsRouter.use(scrubbedErrors);

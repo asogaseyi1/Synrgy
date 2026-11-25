@@ -82,7 +82,7 @@ export function ClockPage() {
           <p>Loading…</p>
         ) : s.state === 'off' ? (
           <>
-            <span className="status-pill">Clocked out</span>
+            <span className="status-pill" role="status">Clocked out</span>
             <p className="state-label">Ready to start your shift?</p>
             <button className="big" disabled={busy} onClick={() => act('/time/clock-in')}>
               Clock in
@@ -90,11 +90,11 @@ export function ClockPage() {
           </>
         ) : (
           <>
-            <span className="status-pill">{s.state === 'on_break' ? 'On break' : 'Working'}</span>
+            <span className="status-pill" role="status">{s.state === 'on_break' ? 'On break' : 'Working'}</span>
             <p className="state-label">
               {s.state === 'on_break' ? 'Break time' : 'Shift time'} · clocked in at {time(s.session!.clockInAt, tz)}
             </p>
-            <p className="timer">{clockDuration(s.state === 'on_break' ? sinceBreak : sinceIn)}</p>
+            <p className="timer" role="timer">{clockDuration(s.state === 'on_break' ? sinceBreak : sinceIn)}</p>
             <div className="actions">
               {s.state === 'working' ? (
                 <button disabled={busy} className="secondary" onClick={() => act('/time/break/start', { kind: 'unpaid' })}>
@@ -111,7 +111,7 @@ export function ClockPage() {
             </div>
           </>
         )}
-        {(error || status.error) && <p className="error">{error ?? status.error}</p>}
+        {(error || status.error) && <p className="error" role="alert">{error ?? status.error}</p>}
       </div>
       <div className="stats today">
         {today.data && (

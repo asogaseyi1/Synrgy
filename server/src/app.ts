@@ -1,7 +1,13 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { config } from './config.ts';
+import { pool } from './db.ts';
 import { errorHandler, notFound } from './lib/errors.ts';
+import { errorFields, log, requestLogger } from './lib/logger.ts';
+import { pendingMigrations } from './migrate.ts';
 import { loadSession, requireAuth } from './middleware/auth.ts';
 import { bodyField, csrfProtection, rateLimit } from './middleware/security.ts';
 import { announcementsRouter } from './routes/announcements.ts';
@@ -14,11 +20,24 @@ import { shiftsRouter } from './routes/shifts.ts';
 import { swapsRouter } from './routes/swaps.ts';
 import { timeRouter } from './routes/time.ts';
 
-export function createApp() {
+export function createApp(opts: { staticDir?: string } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
-  app.use(helmet());
+  app.use(requestLogger);
+  app.use(
+    helmet({
+      // Over plain http (local production try-outs) these would break the page.
+      strictTransportSecurity: config.https,
+      contentSecurityPolicy: {
+        directives: {
+          'upgrade-insecure-requests': config.https ? [] : null,
+          'worker-src': ["'self'"],
+          'manifest-src': ["'self'"],
+        },
+      },
+    }),
+  );
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
   app.use('/api', csrfProtection);
@@ -35,8 +54,25 @@ export function createApp() {
   app.post('/api/public/reports/orgs/:slug/reports', rateLimit('report-submit', 10, 60 * MIN));
   app.use(['/api/public/reports/access', '/api/public/reports/messages'], rateLimit('report-access', 30, 15 * MIN));
 
+  /** Liveness: the process is up. */
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
+  });
+
+  /** Readiness: the database answers and the schema is current. */
+  app.get('/api/health/ready', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      const pending = await pendingMigrations(pool);
+      if (pending.length) {
+        res.status(503).json({ ok: false, reason: 'migrations_pending', pending });
+        return;
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      log.warn('readiness check failed', errorFields(err));
+      res.status(503).json({ ok: false, reason: 'database_unavailable' });
+    }
   });
 
   // Anonymous reporting is mounted before session loading on purpose: these handlers
@@ -58,6 +94,40 @@ export function createApp() {
   app.use('/api', () => {
     throw notFound('No such endpoint');
   });
+
+  // Production: serve the built web app from the same origin (no CORS, one deployable).
+  const staticDir = opts.staticDir ?? config.staticDir;
+  if (staticDir) serveClient(app, path.resolve(staticDir));
+
   app.use(errorHandler);
   return app;
+}
+
+function serveClient(app: express.Express, dir: string) {
+  const index = path.join(dir, 'index.html');
+  if (!existsSync(index)) {
+    log.warn('STATIC_DIR has no index.html; the web app will not be served', { dir });
+    return;
+  }
+  // Hashed build assets never change: cache for a year. Everything else revalidates.
+  app.use(
+    '/assets',
+    express.static(path.join(dir, 'assets'), { immutable: true, maxAge: '365d', index: false, fallthrough: false }),
+  );
+  app.use(
+    express.static(dir, {
+      index: false,
+      setHeaders: (res, file) => {
+        res.set('Cache-Control', 'no-cache');
+        // The service worker must be allowed to control the whole site.
+        if (file.endsWith('sw.js')) res.set('Service-Worker-Allowed', '/');
+      },
+    }),
+  );
+  // Client-side routes: any other GET that accepts HTML gets the app shell.
+  app.get(/^\/(?!api\/).*/, (req, res, next) => {
+    if (!req.accepts('html')) return next();
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(index);
+  });
 }

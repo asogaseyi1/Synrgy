@@ -29,7 +29,7 @@ export async function startSession(db: Queryable, res: Response, userId: string)
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.isProd,
+    secure: config.https,
     expires: expiresAt,
     path: '/',
   });

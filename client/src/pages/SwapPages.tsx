@@ -114,7 +114,7 @@ export function SwapsPage() {
   const tz = organization.timezone;
   const { data, error, reload } = useApi(() => api.get<SwapLists>('/swaps'));
   const { errors, busy, run } = useSwapAction(reload);
-  const err = (id: string) => errors[id] && <p className="error">{errors[id]}</p>;
+  const err = (id: string) => errors[id] && <p className="error" role="alert">{errors[id]}</p>;
 
   return (
     <section>
@@ -128,7 +128,7 @@ export function SwapsPage() {
         </Link>
       </div>
       <p className="muted">To trade one of your shifts, click it on the schedule.</p>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
 
       {data && (
         <>
@@ -197,7 +197,7 @@ export function SwapApprovals() {
 
   return (
     <>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && data.review.length === 0 && <p className="empty">No swaps waiting for approval.</p>}
       <div className="card-list">
         {data?.review.map((s) => (
@@ -216,7 +216,7 @@ export function SwapApprovals() {
                   Approve
                 </button>
               </div>
-              {errors[s.id] && <p className="error">{errors[s.id]}</p>}
+              {errors[s.id] && <p className="error" role="alert">{errors[s.id]}</p>}
             </div>
           </SwapCard>
         ))}

@@ -91,8 +91,8 @@ export function AnnouncementsPage() {
           )}
         </div>
       </div>
-      {error && <p className="error">{error}</p>}
-      {ackError && <p className="error">{ackError}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {ackError && <p className="error" role="alert">{ackError}</p>}
       {data && data.announcements.length === 0 && (
         <p className="empty">{archived ? 'Nothing in the archive yet.' : "You're all caught up — no announcements right now."}</p>
       )}
@@ -194,8 +194,8 @@ export function ManageAnnouncementsPage() {
         </div>
         <button onClick={() => setEditing('new')}>New announcement</button>
       </div>
-      {error && <p className="error">{error}</p>}
-      {actionError && <p className="error">{actionError}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {actionError && <p className="error" role="alert">{actionError}</p>}
       {data && data.announcements.length === 0 && <p className="empty">You haven't posted anything yet.</p>}
       <div className="card-list">
         {data?.announcements.map((a) => (
@@ -424,7 +424,7 @@ function AnnouncementEditor({
         {wasPublished && textChanged && existing.requiresAck && (
           <p className="banner small">Changing the text will reset everyone's acknowledgement — they'll be asked to confirm again.</p>
         )}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
         <div className="card-actions">
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
@@ -454,7 +454,7 @@ function ReceiptsDialog({ announcement, onClose }: { announcement: ManagedAnnoun
           {data && <span className="count">{data.receipts.filter(pending).length}</span>}
         </button>
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && rows.length === 0 && <p className="empty">{filter === 'pending' ? 'Everyone is done. 🎉' : 'No recipients.'}</p>}
       {rows.length > 0 && (
         <table className="receipts">

@@ -72,7 +72,7 @@ export function MembersPage() {
           <code>{inviteLink.url}</code>
         </p>
       )}
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
 
       {!!invites.data?.invitations.length && (
         <>

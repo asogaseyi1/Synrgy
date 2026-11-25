@@ -165,11 +165,25 @@ Each milestone ends with working API + UI + tests and can be shipped on its own.
 - [ ] Later: SSO (OIDC/SAML), SMTP provider (`npm` install failed in this environment; it's one more entry in `providers`),
       shared rate-limit store for multi-instance deploys, pay periods/approval locks, holiday pay, per-location time zones
 
-### M7 — Production readiness
-- [ ] CI (GitHub Actions): typecheck, test against Postgres service
-- [ ] Production Dockerfile; server serves built client
-- [ ] Structured logging (with report routes excluded), health checks, backups doc
-- [ ] Accessibility pass, mobile-friendly clock page (installable PWA for kiosks/phones)
+### M7 — Production readiness ✅
+- [x] CI (GitHub Actions): typecheck, tests against a Postgres 17 service, client build, Docker image build (not pushed)
+- [x] Production Dockerfile (multi-stage, non-root, ~270 MB, `HEALTHCHECK`); the API serves the built client
+      (hashed assets cached for a year, app shell `no-cache`, SPA fallback that never shadows `/api`).
+      Migrations run on start under a Postgres advisory lock; graceful shutdown on SIGTERM.
+      `docker compose --profile app up --build` runs it locally
+- [x] Structured JSON logging with request ids. Anonymous-report traffic (`/api/public/reports/*`, `/r/*`) is never
+      logged; tokens in URLs are redacted; no query strings, bodies, IPs or user agents; pg error details dropped
+- [x] Health: `/api/health` (liveness) and `/api/health/ready` (DB reachable + no pending migrations)
+- [x] `docs/OPERATIONS.md`: deploy, configuration, health checks, logs (incl. proxy config so it doesn't log
+      report traffic), backups and restore testing, security checklist, upgrades
+- [x] Accessibility: AA contrast for the orange palette (primary moved to orange-700, 5.2:1), skip link, visible
+      keyboard focus, focus moves to the page and the title updates on navigation, dialogs trap and restore focus,
+      errors/notices announced (`role=alert/status`), clock state announced, badge counts have screen-reader text,
+      reduced-motion and forced-colors support
+- [x] Installable PWA: manifest, generated icons (incl. maskable), service worker (offline app shell; never caches
+      `/api`), offline banner, safe-area insets, phone layout with full-width clock buttons and bottom-sheet dialogs
+- [ ] Later: offline clock-in queue, kiosk mode (shared device with PIN clock-in), image publishing to a registry,
+      automated accessibility checks (axe) in CI, OpenTelemetry traces
 
 ---
 

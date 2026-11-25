@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import { isUniqueViolation } from '../db.ts';
+import { errorFields, log, redactPath } from './logger.ts';
 
 export class HttpError extends Error {
   status: number;
@@ -31,7 +32,7 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
   return result.data;
 }
 
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: { code: err.code, message: err.message, details: err.details } });
     return;
@@ -48,6 +49,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(400).json({ error: { code: 'bad_request', message: 'Malformed JSON' } });
     return;
   }
-  console.error(err);
+  // Client errors raised by middleware (body too large, missing static file, ...).
+  const status = Number(err?.status ?? err?.statusCode);
+  if (status >= 400 && status < 500) {
+    res.status(status).json({ error: { code: err?.type ?? 'client_error', message: err?.expose ? err.message : 'Request rejected' } });
+    return;
+  }
+  log.error('unhandled error', { reqId: res.locals.requestId, method: req.method, path: redactPath(req.originalUrl.split('?')[0]), ...errorFields(err) });
   res.status(500).json({ error: { code: 'internal', message: 'Something went wrong' } });
 };

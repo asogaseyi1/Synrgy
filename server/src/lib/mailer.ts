@@ -1,4 +1,5 @@
 import { config } from '../config.ts';
+import { errorFields, log } from './logger.ts';
 
 /**
  * Pluggable outbound email. Pick a provider with MAIL_PROVIDER:
@@ -52,7 +53,7 @@ const pending = new Set<Promise<unknown>>();
 export function sendMail(mail: Mail): void {
   const provider = providers[config.mailProvider] ?? providers.none;
   const p = provider({ ...mail, from: config.mailFrom })
-    .catch((err) => console.error(`[mail] delivery failed via ${config.mailProvider}: ${err?.message ?? 'error'}`))
+    .catch((err) => log.error('mail delivery failed', { provider: config.mailProvider, message: err?.message }))
     .finally(() => pending.delete(p));
   pending.add(p);
 }
@@ -60,7 +61,7 @@ export function sendMail(mail: Mail): void {
 /** Track background work (e.g. notification lookups) so tests can wait for it. */
 export function background(work: Promise<unknown>): void {
   const p = work
-    .catch((err) => console.error(`[notify] failed: ${err?.code ?? err?.message ?? 'error'}`))
+    .catch((err) => log.error('background job failed', errorFields(err)))
     .finally(() => pending.delete(p));
   pending.add(p);
 }

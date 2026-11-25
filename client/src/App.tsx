@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router';
+import { useOnline, useRouteFocus } from './a11y.ts';
 import { atLeast, type Role } from './api.ts';
 import { AuthProvider, useAuth } from './auth.tsx';
 import { Brand } from './Brand.tsx';
@@ -38,22 +39,38 @@ function GuestOnly({ children }: { children: ReactNode }) {
   return me ? <Navigate to="/" replace /> : children;
 }
 
-const Count = ({ n }: { n: number }) => (n > 0 ? <span className="count">{n}</span> : null);
+const Count = ({ n }: { n: number }) =>
+  n > 0 ? (
+    <span className="count">
+      {n}
+      <span className="sr-only"> waiting</span>
+    </span>
+  ) : null;
 
 function Layout() {
   const { me, logout } = useAuth();
   const isManager = !!me && atLeast(me.user.role, 'manager');
   const counts = useCounts(isManager, !!me?.user.canReviewReports);
+  const mainRef = useRouteFocus();
+  const online = useOnline();
   if (!me) return null;
   const role = me.user.role;
   return (
     <div className="shell">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      {!online && (
+        <div className="offline-banner" role="status">
+          You're offline. Clocking in and other changes need a connection.
+        </div>
+      )}
       <header>
         <div>
           <Brand />
           <span className="org">{me.organization.name}</span>
         </div>
-        <nav>
+        <nav aria-label="Main">
           <NavLink to="/" end>
             Clock
           </NavLink>
@@ -93,16 +110,23 @@ function Layout() {
               ⚙
             </NavLink>
           )}
-          <NavLink to="/account" className="avatar" title={`${me.user.firstName} ${me.user.lastName} · ${role} · Your account`}>
-            {me.user.firstName[0]}
-            {me.user.lastName[0]}
+          <NavLink
+            to="/account"
+            className="avatar"
+            title={`${me.user.firstName} ${me.user.lastName} · ${role} · Your account`}
+            aria-label={`Your account (${me.user.firstName} ${me.user.lastName})`}
+          >
+            <span aria-hidden="true">
+              {me.user.firstName[0]}
+              {me.user.lastName[0]}
+            </span>
           </NavLink>
           <button className="link" onClick={() => void logout()}>
             Sign out
           </button>
         </div>
       </header>
-      <main>
+      <main id="main" ref={mainRef} tabIndex={-1}>
         <Outlet />
       </main>
     </div>

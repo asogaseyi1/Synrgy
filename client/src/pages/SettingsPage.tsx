@@ -31,7 +31,7 @@ function Section({ title, intro, onSave, children }: { title: string; intro?: Re
       <h2 className="flush">{title}</h2>
       {intro && <p className="muted small flush">{intro}</p>}
       {children}
-      {msg && <p className={msg.ok ? 'notice' : 'error'}>{msg.text}</p>}
+      {msg && <p className={msg.ok ? 'notice' : 'error'} role={msg.ok ? 'status' : 'alert'}>{msg.text}</p>}
       <div className="card-actions">
         <button disabled={busy}>Save</button>
       </div>
@@ -109,7 +109,7 @@ export function SettingsPage() {
     <section className="narrow">
       <p className="eyebrow">Admin</p>
       <h1>Workspace settings</h1>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && s && (
         <>
           <Section
@@ -281,7 +281,7 @@ export function SettingsPage() {
             <div>
               <strong className="small">Reviewers</strong>
               {members.data && reviewers.length === 0 && (
-                <p className="error small">Nobody can read reports right now. Choose at least one reviewer on the People page.</p>
+                <p className="error small" role="alert">Nobody can read reports right now. Choose at least one reviewer on the People page.</p>
               )}
               {reviewers.length > 0 && (
                 <p className="small flush">
@@ -376,8 +376,8 @@ function UnitsCard() {
     <div className="card">
       <h2 className="flush">Departments & locations</h2>
       <p className="muted small flush">Group people to filter payroll and target announcements. Assign people on the People page.</p>
-      {error && <p className="error">{error}</p>}
-      {actionError && <p className="error">{actionError}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {actionError && <p className="error" role="alert">{actionError}</p>}
       <div className="units-grid">
         {column('department', 'Departments', 'e.g. Kitchen')}
         {column('location', 'Locations', 'e.g. Downtown store')}

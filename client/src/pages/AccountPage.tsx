@@ -70,7 +70,7 @@ export function AccountPage() {
             <span className="muted small">Swap requests, time corrections and their outcomes. Password and invite emails always send.</span>
           </span>
         </label>
-        {profileMsg && <p className={profileMsg.ok ? 'notice' : 'error'}>{profileMsg.text}</p>}
+        {profileMsg && <p className={profileMsg.ok ? 'notice' : 'error'} role={profileMsg.ok ? 'status' : 'alert'}>{profileMsg.text}</p>}
         <div className="card-actions">
           <button>Save</button>
         </div>
@@ -92,7 +92,7 @@ export function AccountPage() {
             <input name="confirm" type="password" minLength={8} required autoComplete="new-password" />
           </label>
         </div>
-        {pwMsg && <p className={pwMsg.ok ? 'notice' : 'error'}>{pwMsg.text}</p>}
+        {pwMsg && <p className={pwMsg.ok ? 'notice' : 'error'} role={pwMsg.ok ? 'status' : 'alert'}>{pwMsg.text}</p>}
         <div className="card-actions">
           <button>Change password</button>
         </div>

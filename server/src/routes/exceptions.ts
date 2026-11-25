@@ -4,12 +4,13 @@ import { pool, tx, isUniqueViolation, type Queryable } from '../db.ts';
 import { canReview } from '../lib/access.ts';
 import { audit } from '../lib/audit.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { exceptionDecided, exceptionSubmitted } from '../lib/notify.ts';
+import { getSettings } from '../lib/settings.ts';
 import { atLeast, auth } from '../middleware/auth.ts';
 
 export const exceptionsRouter = Router();
 
-// Policy limits. These become org settings in M6.
-export const MAX_EXCEPTION_AGE_DAYS = 31;
+// The correction window is an org setting (correctionWindowDays); the shift length cap is fixed.
 export const MAX_SHIFT_HOURS = 24;
 
 const HOUR = 3_600_000;
@@ -35,12 +36,12 @@ const createSchema = z.object({
 type Requested = Pick<z.infer<typeof createSchema>, 'clockInAt' | 'clockOutAt' | 'breaks'>;
 
 /** Sanity rules for a proposed shift. Throws 400 with a readable message. */
-function validateShape(r: Requested) {
+function validateShape(r: Requested, windowDays: number) {
   const now = Date.now();
   if (r.clockOutAt <= r.clockInAt) throw badRequest('Clock-out must be after clock-in');
   if (r.clockOutAt.getTime() > now + 60_000) throw badRequest("Clock-out can't be in the future");
-  if (r.clockInAt.getTime() < now - MAX_EXCEPTION_AGE_DAYS * DAY) {
-    throw badRequest(`Corrections can only go back ${MAX_EXCEPTION_AGE_DAYS} days`);
+  if (r.clockInAt.getTime() < now - windowDays * DAY) {
+    throw badRequest(`Corrections can only go back ${windowDays} days`);
   }
   if (r.clockOutAt.getTime() - r.clockInAt.getTime() > MAX_SHIFT_HOURS * HOUR) {
     throw badRequest(`A shift can't be longer than ${MAX_SHIFT_HOURS} hours`);
@@ -102,7 +103,7 @@ async function loadException(db: Queryable, organizationId: string, id: string) 
 exceptionsRouter.post('/', async (req, res) => {
   const me = auth(req);
   const body = parse(createSchema, req.body);
-  validateShape(body);
+  validateShape(body, (await getSettings(pool, me.organizationId)).correctionWindowDays);
 
   let original = null;
   if (body.kind === 'missed_shift') {
@@ -139,6 +140,7 @@ exceptionsRouter.post('/', async (req, res) => {
     }
     throw err;
   }
+  exceptionSubmitted(id);
   res.status(201).json({ exception: await loadException(pool, me.organizationId, id) });
 });
 
@@ -294,6 +296,7 @@ exceptionsRouter.post('/:id/approve', async (req, res) => {
       },
     });
   });
+  exceptionDecided(id);
   res.json({ exception: await loadException(pool, me.organizationId, id) });
 });
 
@@ -320,5 +323,6 @@ exceptionsRouter.post('/:id/reject', async (req, res) => {
       data: { note },
     });
   });
+  exceptionDecided(id);
   res.json({ exception: await loadException(pool, me.organizationId, id) });
 });

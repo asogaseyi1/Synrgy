@@ -13,8 +13,10 @@ See **[docs/PLAN.md](docs/PLAN.md)** for the architecture, data model and milest
 | M1 Time clock: clock in/out, breaks, timesheets, team view | ✅ |
 | M2 Missed-punch exceptions: requests, approvals, audit trail | ✅ |
 | M3 Scheduling & shift swaps: week grid, drafts/publish, swap/cover/open offers | ✅ |
-| M4 Announcements | next |
-| M5 Anonymous reporting | planned |
+| M4 Announcements: targeting, pinning, scheduling/expiry, read receipts, acknowledgements | ✅ |
+| M5 Anonymous reporting: public form, code + key follow-up, reviewer inbox, audited access | ✅ |
+| M6 Making it generic: pay rules & payroll export, departments/locations, email, password reset, rate limiting, CSRF | ✅ |
+| M7 Production readiness: CI, Docker, logging, PWA | next |
 
 ## Getting started
 
@@ -29,7 +31,9 @@ npm run dev               # API on :4000, web on :5173 (proxies /api)
 ```
 
 Open http://localhost:5173, click **Create a workspace**, then invite people from **People**.
-Email isn't set up yet, so the invite link is shown on screen for you to share.
+In development, emails (invites, password resets, notifications) are printed to the API log; the invite link is
+also shown on screen. To send real email, set `MAIL_PROVIDER` (see `.env.example`). If the web app runs somewhere
+other than `CLIENT_ORIGIN` (e.g. Vite picked another port), set `APP_URL` so emailed links point to the right place.
 
 ## Scripts
 

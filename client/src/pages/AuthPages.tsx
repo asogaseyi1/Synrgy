@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { api, type Me, type Organization, type User } from '../api.ts';
+import { api, ApiError, type Me, type Organization, type User } from '../api.ts';
 import { useAuth } from '../auth.tsx';
 import { Brand } from '../Brand.tsx';
 import { errorMessage, useApi } from '../useApi.ts';
@@ -58,6 +58,8 @@ export function LoginPage() {
         <button disabled={busy}>Sign in</button>
       </form>
       <p className="footer">
+        <Link to="/forgot">Forgot your password?</Link>
+        <br />
         New company? <Link to="/register">Create a workspace</Link>
       </p>
       </div>
@@ -182,6 +184,101 @@ export function AcceptInvitePage() {
         {error && <p className="error">{error}</p>}
         <button disabled={busy}>Join</button>
       </form>
+      </div>
+    </main>
+  );
+}
+
+export function ForgotPasswordPage() {
+  const [sent, setSent] = useState(false);
+  const { error, busy, onSubmit } = useSubmit(async (v) => {
+    await api.post('/auth/password-reset', v);
+    setSent(true);
+  });
+
+  return (
+    <main className="auth-page">
+      <div className="auth-card">
+        <Brand />
+        <h1>Reset your password</h1>
+        {sent ? (
+          <p className="notice">
+            If that account exists, we've emailed a link to reset the password. It expires in an hour. Check your spam folder if it
+            doesn't arrive.
+          </p>
+        ) : (
+          <>
+            <p className="subtitle">We'll email you a link to choose a new one.</p>
+            <form onSubmit={onSubmit}>
+              <label>
+                Workspace
+                <input name="workspace" required autoComplete="organization" placeholder="acme" />
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" required autoComplete="email" />
+              </label>
+              {error && <p className="error">{error}</p>}
+              <button disabled={busy}>Send reset link</button>
+            </form>
+          </>
+        )}
+        <p className="footer">
+          <Link to="/login">Back to sign in</Link>
+        </p>
+      </div>
+    </main>
+  );
+}
+
+export function ResetPasswordPage() {
+  const { token = '' } = useParams();
+  const { setMe } = useAuth();
+  const navigate = useNavigate();
+  const { data, error: loadError } = useApi(
+    () => api.get<{ firstName: string; organizationName: string }>(`/auth/password-reset/${token}`),
+    [token],
+  );
+  const { error, busy, onSubmit } = useSubmit(async (v) => {
+    if (v.password !== v.confirm) throw new ApiError(400, 'mismatch', "The passwords don't match");
+    setMe(await api.post<Me>(`/auth/password-reset/${token}`, { password: v.password }));
+    navigate('/');
+  });
+
+  return (
+    <main className="auth-page">
+      <div className="auth-card">
+        <Brand />
+        {loadError ? (
+          <>
+            <h1>Link expired</h1>
+            <p className="error">{loadError}</p>
+            <p className="footer">
+              <Link to="/forgot">Request a new link</Link>
+            </p>
+          </>
+        ) : !data ? (
+          <p>Loading…</p>
+        ) : (
+          <>
+            <h1>Choose a new password</h1>
+            <p className="subtitle">
+              Hi {data.firstName}, set a new password for {data.organizationName}. You'll be signed out on other devices.
+            </p>
+            <form onSubmit={onSubmit}>
+              <label>
+                New password
+                <input name="password" type="password" minLength={8} required autoComplete="new-password" />
+              </label>
+              <label>
+                Confirm new password
+                <input name="confirm" type="password" minLength={8} required autoComplete="new-password" />
+              </label>
+              {error && <p className="error">{error}</p>}
+              <button disabled={busy}>Save password and sign in</button>
+            </form>
+          </>
+        )}
       </div>
     </main>
   );

@@ -4,7 +4,8 @@ import { pool, tx, isUniqueViolation, type Queryable } from '../db.ts';
 import { isManagerOf } from '../lib/access.ts';
 import { audit } from '../lib/audit.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
-import { getOrg, type OrgSettings } from '../lib/settings.ts';
+import { swapDecided, swapNeedsApproval, swapRequested } from '../lib/notify.ts';
+import { getOrg, weekStartSql, type OrgSettings } from '../lib/settings.ts';
 import { atLeast, auth, type AuthContext } from '../middleware/auth.ts';
 
 export const swapsRouter = Router();
@@ -91,7 +92,7 @@ async function checkAssignment(
   const max = org.settings.maxWeeklyHours;
   if (max) {
     const { rows } = await db.query(
-      `WITH wk AS (SELECT date_trunc('week', $3::timestamptz AT TIME ZONE $4) AT TIME ZONE $4 AS start)
+      `WITH wk AS (SELECT ${weekStartSql('$3::timestamptz', '$4', org.settings.weekStartsOn)} AS start)
        SELECT COALESCE(SUM(EXTRACT(EPOCH FROM s.ends_at - s.starts_at)), 0)::float AS seconds
          FROM scheduled_shifts s, wk
         WHERE s.user_id = $1 AND s.id <> ALL($2::uuid[])
@@ -255,6 +256,7 @@ swapsRouter.post('/', async (req, res) => {
       throw err;
     }
   });
+  swapRequested(id);
   res.status(201).json({ swap: await loadSwap(pool, me.organizationId, id) });
 });
 
@@ -314,6 +316,8 @@ swapsRouter.post('/:id/accept', async (req, res) => {
     );
     if (!org.settings.requireSwapApproval) await applySwap(db, me, sw, me.userId, { reviewerId: null, note: null });
   });
+  if (org.settings.requireSwapApproval) swapNeedsApproval(id);
+  else swapDecided(id);
   res.json({ swap: await loadSwap(pool, me.organizationId, id) });
 });
 
@@ -326,6 +330,7 @@ swapsRouter.post('/:id/decline', async (req, res) => {
     [id, me.organizationId, me.userId],
   );
   if (!rowCount) throw conflict('not_pending', 'This request is no longer open');
+  swapDecided(id);
   res.json({ swap: await loadSwap(pool, me.organizationId, id) });
 });
 
@@ -355,6 +360,7 @@ swapsRouter.post('/:id/approve', async (req, res) => {
     await verifySwap(db, org, sw, sw.accepted_by);
     await applySwap(db, me, sw, sw.accepted_by, { reviewerId: me.userId, note: note || null });
   });
+  swapDecided(id);
   res.json({ swap: await loadSwap(pool, me.organizationId, id) });
 });
 
@@ -372,5 +378,6 @@ swapsRouter.post('/:id/reject', async (req, res) => {
     );
     await audit(db, { organizationId: me.organizationId, actorId: me.userId, action: 'swap.rejected', entity: 'shift_swap', entityId: id, data: { note } });
   });
+  swapDecided(id);
   res.json({ swap: await loadSwap(pool, me.organizationId, id) });
 });

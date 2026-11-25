@@ -3,15 +3,18 @@ import { z } from 'zod';
 import { pool, tx, isUniqueViolation, type Queryable } from '../db.ts';
 import { badRequest, conflict, forbidden, parse } from '../lib/errors.ts';
 import { canViewTime } from '../lib/access.ts';
-import { atLeast, auth, requireRole } from '../middleware/auth.ts';
+import { audit } from '../lib/audit.ts';
+import { computePayroll, csv, hours } from '../lib/payroll.ts';
+import { getOrg, getSettings } from '../lib/settings.ts';
+import { atLeast, auth, requireRole, type AuthContext } from '../middleware/auth.ts';
 
 export const timeRouter = Router();
 
-/** An open session older than this is probably a forgotten clock-out. Becomes an org setting in M6. */
-export const STALE_OPEN_HOURS = 16;
 
 /** Current clock state: off, working, or on break. */
 async function getStatus(db: Queryable, userId: string) {
+  const org = await db.query('SELECT organization_id FROM users WHERE id = $1', [userId]);
+  const { staleOpenHours } = await getSettings(db, org.rows[0].organization_id);
   const { rows } = await db.query(
     `SELECT ws.id, ws.clock_in_at AS "clockInAt",
             b.id AS "breakId", b.started_at AS "breakStartedAt", b.kind AS "breakKind"
@@ -25,7 +28,7 @@ async function getStatus(db: Queryable, userId: string) {
   return {
     state: row.breakId ? ('on_break' as const) : ('working' as const),
     session: { id: row.id, clockInAt: row.clockInAt },
-    stale: Date.now() - new Date(row.clockInAt).getTime() > STALE_OPEN_HOURS * 3_600_000,
+    stale: Date.now() - new Date(row.clockInAt).getTime() > staleOpenHours * 3_600_000,
     break: row.breakId ? { id: row.breakId, startedAt: row.breakStartedAt, kind: row.breakKind } : null,
   };
 }
@@ -178,4 +181,145 @@ timeRouter.get('/team', requireRole('manager'), async (req, res) => {
     [me.organizationId, range.from, range.to, scopeToReports ? me.userId : null],
   );
   res.json({ from: range.from, to: range.to, members: rows });
+});
+
+// ---- Payroll (rules applied) & CSV export ----
+
+const payrollSchema = z
+  .object({
+    from: z.iso.date(),
+    to: z.iso.date(), // inclusive
+    departmentId: z.uuid().optional(),
+    locationId: z.uuid().optional(),
+    format: z.enum(['summary', 'detail']).default('summary'),
+  })
+  .refine((r) => r.from <= r.to, 'from must not be after to')
+  .refine(
+    (r) => (Date.parse(r.to) - Date.parse(r.from)) / 86_400_000 < MAX_RANGE_DAYS,
+    `Range can be at most ${MAX_RANGE_DAYS} days`,
+  );
+
+/**
+ * Completed sessions whose clock-in falls on [from, to] in the org's time zone, for the people
+ * `me` may see (managers: direct reports + self; admins: everyone), optionally filtered.
+ */
+async function loadPayroll(me: AuthContext, q: z.infer<typeof payrollSchema>) {
+  const org = await getOrg(pool, me.organizationId);
+  const scoped = !atLeast(me.role, 'admin');
+  const values = [me.organizationId, q.from, q.to, org.timezone, scoped ? me.userId : null, q.departmentId ?? null, q.locationId ?? null];
+  const people = await pool.query(
+    `SELECT u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email, u.status,
+            d.name AS department, l.name AS location,
+            (SELECT count(*)::int FROM work_sessions o
+              WHERE o.user_id = u.id AND o.clock_out_at IS NULL
+                AND o.clock_in_at >= ($2::date)::timestamp AT TIME ZONE $4
+                AND o.clock_in_at < ($3::date + 1)::timestamp AT TIME ZONE $4) AS "openSessions"
+       FROM users u
+       LEFT JOIN org_units d ON d.id = u.department_id
+       LEFT JOIN org_units l ON l.id = u.location_id
+      WHERE u.organization_id = $1
+        AND ($5::uuid IS NULL OR u.manager_id = $5 OR u.id = $5)
+        AND ($6::uuid IS NULL OR u.department_id = $6)
+        AND ($7::uuid IS NULL OR u.location_id = $7)
+        AND (u.status = 'active' OR EXISTS (
+              SELECT 1 FROM work_sessions w WHERE w.user_id = u.id
+                 AND w.clock_in_at >= ($2::date)::timestamp AT TIME ZONE $4
+                 AND w.clock_in_at < ($3::date + 1)::timestamp AT TIME ZONE $4))
+      ORDER BY u.last_name, u.first_name`,
+    values,
+  );
+  const ids = people.rows.map((p) => p.id);
+  const sessions = await pool.query(
+    `SELECT ws.id, ws.user_id AS "userId", ws.clock_in_at AS "clockInAt", ws.clock_out_at AS "clockOutAt", ws.source,
+            ${SESSION_TOTALS}
+       FROM work_sessions ws LEFT JOIN breaks b ON b.work_session_id = ws.id
+      WHERE ws.organization_id = $1 AND ws.user_id = ANY($4::uuid[]) AND ws.clock_out_at IS NOT NULL
+        AND ws.clock_in_at >= ($2::date)::timestamp AT TIME ZONE $5
+        AND ws.clock_in_at < ($3::date + 1)::timestamp AT TIME ZONE $5
+      GROUP BY ws.id ORDER BY ws.clock_in_at`,
+    [me.organizationId, q.from, q.to, ids, org.timezone],
+  );
+  const { bySession, people: pay } = computePayroll(sessions.rows, org.settings, org.timezone);
+  return { org, members: people.rows, sessions: sessions.rows, bySession, pay };
+}
+
+const ZERO_PAY = {
+  sessionCount: 0,
+  paidSeconds: 0,
+  regularSeconds: 0,
+  overtimeSeconds: 0,
+  dailyOvertimeSeconds: 0,
+  weeklyOvertimeSeconds: 0,
+  unpaidBreakSeconds: 0,
+  paidBreakSeconds: 0,
+  autoDeductSeconds: 0,
+};
+
+timeRouter.get('/payroll', requireRole('manager'), async (req, res) => {
+  const me = auth(req);
+  const q = parse(payrollSchema, req.query);
+  const { org, members, pay } = await loadPayroll(me, q);
+  const s = org.settings;
+  res.json({
+    from: q.from,
+    to: q.to,
+    rules: {
+      roundingMinutes: s.roundingMinutes,
+      autoBreakAfterHours: s.autoBreakAfterHours,
+      autoBreakMinutes: s.autoBreakMinutes,
+      dailyOvertimeHours: s.dailyOvertimeHours,
+      weeklyOvertimeHours: s.weeklyOvertimeHours,
+      weekStartsOn: s.weekStartsOn,
+    },
+    members: members.map((m) => {
+      const { days: _d, userId: _u, ...x } = pay.get(m.id) ?? { ...ZERO_PAY, days: {}, userId: m.id };
+      return { ...m, ...x };
+    }),
+  });
+});
+
+timeRouter.get('/export', requireRole('manager'), async (req, res) => {
+  const me = auth(req);
+  const q = parse(payrollSchema, req.query);
+  const { org, members, sessions, bySession, pay } = await loadPayroll(me, q);
+  const tz = org.timezone;
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .format(d)
+      .replace(',', '');
+  const mins = (sec: number) => Math.round(sec / 60);
+
+  let rows: unknown[][];
+  if (q.format === 'summary') {
+    rows = [
+      ['Employee', 'Email', 'Department', 'Location', 'Shifts', 'Paid hours', 'Regular hours', 'Overtime hours', 'Daily OT hours', 'Weekly OT hours', 'Unpaid break hours', 'Paid break hours', 'Auto-deducted hours', 'Open shifts (excluded)'],
+      ...members.map((m) => {
+        const x = pay.get(m.id) ?? ZERO_PAY;
+        return [
+          `${m.firstName} ${m.lastName}`, m.email, m.department, m.location, x.sessionCount,
+          hours(x.paidSeconds), hours(x.regularSeconds), hours(x.overtimeSeconds), hours(x.dailyOvertimeSeconds), hours(x.weeklyOvertimeSeconds),
+          hours(x.unpaidBreakSeconds), hours(x.paidBreakSeconds), hours(x.autoDeductSeconds), m.openSessions,
+        ];
+      }),
+    ];
+  } else {
+    const byId = new Map(members.map((m) => [m.id, m]));
+    rows = [
+      ['Employee', 'Email', 'Department', 'Location', 'Date', 'Clock in', 'Clock out', 'Rounded in', 'Rounded out', 'Unpaid break min', 'Paid break min', 'Auto-deducted min', 'Paid hours', 'Source'],
+      ...sessions.map((ws) => {
+        const m = byId.get(ws.userId)!;
+        const x = bySession.get(ws.id)!;
+        return [
+          `${m.firstName} ${m.lastName}`, m.email, m.department, m.location, x.day,
+          fmt(ws.clockInAt), fmt(ws.clockOutAt), fmt(x.roundedIn), fmt(x.roundedOut),
+          mins(ws.unpaidBreakSeconds), mins(ws.paidBreakSeconds), mins(x.autoDeductSeconds), hours(x.paidSeconds), ws.source,
+        ];
+      }),
+    ];
+  }
+  await audit(pool, { organizationId: me.organizationId, actorId: me.userId, action: 'time.exported', entity: 'organization', entityId: me.organizationId, data: q });
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="${org.slug}-${q.format}-${q.from}-to-${q.to}.csv"`);
+  res.set('Cache-Control', 'no-store');
+  res.send('﻿' + csv(rows)); // BOM so Excel reads UTF-8 names correctly
 });

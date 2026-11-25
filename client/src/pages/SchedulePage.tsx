@@ -4,7 +4,7 @@ import { api, atLeast, type Shift, type SwapType, type User } from '../api.ts';
 import { useMe } from '../auth.tsx';
 import { duration, time } from '../format.ts';
 import { Modal } from '../Modal.tsx';
-import { addDays, dayKey, formatDay, fromZonedInput, mondayOf, startOfDay, toZonedInput } from '../tz.ts';
+import { addDays, dayKey, formatDay, fromZonedInput, startOfDay, toZonedInput, weekStartOf } from '../tz.ts';
 import { errorMessage, useApi } from '../useApi.ts';
 
 const OPEN_ROW = '__open__';
@@ -14,8 +14,9 @@ export function SchedulePage() {
   const tz = organization.timezone;
   const isManager = atLeast(me.role, 'manager');
   const today = dayKey(new Date(), tz);
+  const thisWeek = weekStartOf(today, organization.weekStartsOn ?? 1);
 
-  const [weekStart, setWeekStart] = useState(() => mondayOf(today));
+  const [weekStart, setWeekStart] = useState(thisWeek);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const from = startOfDay(weekStart, tz);
   const to = startOfDay(addDays(weekStart, 7), tz);
@@ -90,7 +91,7 @@ export function SchedulePage() {
         <div className="toolbar">
           <div className="tabs">
             <button aria-label="Previous week" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
-            <button className={weekStart === mondayOf(today) ? 'active' : ''} onClick={() => setWeekStart(mondayOf(today))}>
+            <button className={weekStart === thisWeek ? 'active' : ''} onClick={() => setWeekStart(thisWeek)}>
               This week
             </button>
             <button aria-label="Next week" onClick={() => setWeekStart(addDays(weekStart, 7))}>›</button>

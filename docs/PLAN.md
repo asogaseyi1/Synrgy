@@ -98,7 +98,7 @@ Each milestone ends with working API + UI + tests and can be shipped on its own.
 - [x] Audit log entry for every correction (before/after) and rejection
 - [x] Sessions open > 16h are flagged as `stale`; the clock page prompts the employee to file a correction
 - [x] UI: My requests, new request form (times in org time zone), Fix links on the timesheet, Approvals queue with nav badge
-- [ ] Later (M6): make the 16h / 31-day / 24h limits org settings; email the reviewer on new requests
+- [x] M6: the 16h stale threshold and 31-day window are org settings; reviewers are emailed on new requests (24h max shift stays fixed)
 
 ### M3 — Scheduling & shift swaps ✅
 - [x] Managers create/edit/delete shifts in a week grid (org time zone, overnight shifts supported); open/unassigned shifts
@@ -115,25 +115,55 @@ Each milestone ends with working API + UI + tests and can be shipped on its own.
 - [ ] Later: copy last week's schedule, shift templates, employees claiming unassigned open shifts directly,
       availability/time-off, notifications
 
-### M4 — Announcements
-- [ ] Admins/managers post announcements targeted to everyone, roles, or specific teams
-- [ ] Pinning, scheduled publish, expiry
-- [ ] Read receipts + "unread" badge; admins see read percentage
-- [ ] Optional "acknowledgement required" for policy updates
+### M4 — Announcements ✅
+- [x] Admins/managers post announcements targeted to everyone, roles, or specific teams.
+      Audience = role filter (empty = all) AND team filter (a manager + their direct reports; null = whole org).
+      Managers can only post to their own team and manage their own posts; admins manage everything
+- [x] Pinning, scheduled publish, expiry (expired posts move to an Archive view)
+- [x] Read receipts + "unread" nav badge (viewing the feed marks posts read); authors see read % and a per-person receipts list
+- [x] Optional "acknowledgement required" for policy updates, with a banner on the clock page.
+      Editing the text of a published post resets acknowledgements and marks it "Edited"
+- [x] Audit log entries for create / update / delete
+- [ ] Later: rich text / attachments, email or push on publish, reminders for unacknowledged posts,
+      targeting by department/location once M6 adds them. Audience is evaluated live, so people who join later also see it
 
-### M5 — Anonymous reporting
-- [ ] Public submission form `/r/:orgSlug` (no auth, no logging)
-- [ ] Tracking code + key shown once; reporter follow-up page
-- [ ] Reviewer inbox (only `can_review_reports`), status workflow (new → investigating → resolved/dismissed)
-- [ ] Two-way anonymous messaging
-- [ ] Admin setting to choose report categories; audit every reviewer access
+### M5 — Anonymous reporting ✅
+- [x] Public submission form `/r/:orgSlug`, no sign-in. The API router (`/api/public/reports`) is mounted **before**
+      session loading, so it can't learn who is signed in; the page runs outside the signed-in app (no `/auth/me`),
+      sends requests with `credentials: 'omit'`, and keeps nothing in browser storage. Responses are `no-store`;
+      errors on these routes log only an error code (Postgres error details can echo values)
+- [x] No reporter identity in the schema (a test asserts no user/IP/agent/timestamp columns); dates are days in the
+      org time zone; message order is a per-report `seq`, not a global sequence; submitting writes no audit entry
+- [x] Tracking code (10 chars) + secret key (20 chars, ~100 bits, bcrypt-hashed) in Crockford base32, shown once,
+      with copy and download. Input is forgiving (case, dashes, O→0, I/L→1); wrong code and wrong key give the same answer
+- [x] Reviewer inbox (only `can_review_reports`; being an admin isn't enough), status workflow new → investigating →
+      resolved/dismissed; replying to a new report moves it to investigating; closed reports stop reporter replies
+- [x] Two-way anonymous messaging; the reporter sees replies from "Investigator", not the reviewer's name
+- [x] Inbox shows no report content; opening a report is audited every time, and the access log is shown to all reviewers
+- [x] Admin settings: report categories, shareable reporting link, reviewer list with a warning when there are none.
+      In-app "Speak up" page explains the protections and suggests using a personal device
+- [ ] Later: rate limiting on public endpoints (M6), attachments, letting reporters exclude a named reviewer,
+      email nudges to reviewers (without content), retention/purge policy for closed reports
 
-### M6 — Making it generic for any company
-- [ ] Org settings: timezone, week start, break rules (paid/unpaid, auto-deduct), rounding, overtime thresholds
-- [ ] Locations / departments / teams
-- [ ] CSV export of timesheets (payroll handoff)
-- [ ] Email notifications (pluggable provider) for invites, swap requests, approvals
-- [ ] Rate limiting, CSRF protection, password reset, optional SSO later
+### M6 — Making it generic for any company ✅
+- [x] Org settings (flat keys in `organizations.settings`, validated, audited): name, time zone, week start (Sun/Mon),
+      forgotten-clock-out threshold and correction window (the old M2 constants), punch rounding (5–30 min),
+      auto-deducted break (only the shortfall vs. breaks actually taken), daily and weekly overtime thresholds
+- [x] Payroll engine (`lib/payroll.ts`, pure + unit-tested): rounding → breaks → auto-deduct → daily OT → weekly OT on
+      remaining straight time; days/weeks in the org time zone; raw punches never modified; open shifts excluded and flagged
+- [x] Departments & locations (`org_units`), assigned on the People page; filter payroll; target announcements
+      (teams remain "a manager + direct reports")
+- [x] Payroll page + CSV export (summary and per-shift detail; UTF-8 BOM for Excel; formula-injection safe; exports audited)
+- [x] Email (`lib/mailer.ts`, pluggable: console / memory / Resend / generic webhook / none) for invitations, password
+      resets, swap requests/approvals/outcomes, time-correction requests/outcomes. Users can opt out of workflow emails.
+      Report reviewers get a **daily, content-free digest** instead of per-report emails (an instant email would date the report)
+- [x] Rate limiting (in memory, salted-hash keys, never raw IPs): login per IP and per account, registration, password
+      reset, invite acceptance, public report submission/access
+- [x] CSRF defence in depth on top of SameSite=Lax: reject form-encodable content types and foreign `Origin`s
+- [x] Password reset by email (1h, single use, signs out everywhere, no account enumeration); change password
+      (keeps this session, ends others); account page
+- [ ] Later: SSO (OIDC/SAML), SMTP provider (`npm` install failed in this environment; it's one more entry in `providers`),
+      shared rate-limit store for multi-instance deploys, pay periods/approval locks, holiday pay, per-location time zones
 
 ### M7 — Production readiness
 - [ ] CI (GitHub Actions): typecheck, test against Postgres service

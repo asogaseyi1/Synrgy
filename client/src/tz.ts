@@ -62,6 +62,13 @@ export function mondayOf(ymd: string): string {
   return addDays(ymd, -((dow + 6) % 7));
 }
 
+/** First day of the week containing `ymd`, for a week starting on Sunday (0) or Monday (1). */
+export function weekStartOf(ymd: string, weekStartsOn: 0 | 1 = 1): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return addDays(ymd, -((dow - weekStartsOn + 7) % 7));
+}
+
 /** Start of an org-local day as an ISO instant. */
 export const startOfDay = (ymd: string, timeZone: string) => fromZonedInput(`${ymd}T00:00`, timeZone);
 

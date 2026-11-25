@@ -1,7 +1,8 @@
 import type { Queryable } from '../db.ts';
 
 export const USER_COLUMNS = `u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", u.role,
-  u.can_review_reports AS "canReviewReports", u.manager_id AS "managerId", u.status, u.created_at AS "createdAt"`;
+  u.can_review_reports AS "canReviewReports", u.manager_id AS "managerId", u.status, u.created_at AS "createdAt",
+  u.department_id AS "departmentId", u.location_id AS "locationId", u.email_notifications AS "emailNotifications"`;
 
 export async function getUser(db: Queryable, organizationId: string, userId: string) {
   const { rows } = await db.query(

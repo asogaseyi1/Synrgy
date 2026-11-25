@@ -6,7 +6,7 @@ import { SwapApprovals } from './SwapPages.tsx';
 export function ApprovalsPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'swaps' ? 'swaps' : 'time';
-  const counts = useCounts(true);
+  const counts = useCounts(true, false);
 
   return (
     <section>

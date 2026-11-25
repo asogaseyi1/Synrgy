@@ -44,6 +44,9 @@ export interface User {
   canReviewReports: boolean;
   managerId: string | null;
   status: 'active' | 'deactivated';
+  departmentId: string | null;
+  locationId: string | null;
+  emailNotifications: boolean;
 }
 
 export interface Organization {
@@ -51,6 +54,8 @@ export interface Organization {
   name: string;
   slug: string;
   timezone: string;
+  /** 0 = Sunday, 1 = Monday. */
+  weekStartsOn: 0 | 1;
 }
 
 export interface Me {
@@ -122,6 +127,22 @@ export const EXCEPTION_KIND_LABELS: Record<ExceptionKind, string> = {
 export interface OrgSettings {
   requireSwapApproval: boolean;
   maxWeeklyHours: number | null;
+  weekStartsOn: 0 | 1;
+  staleOpenHours: number;
+  correctionWindowDays: number;
+  roundingMinutes: 0 | 5 | 6 | 10 | 15 | 30;
+  autoBreakAfterHours: number | null;
+  autoBreakMinutes: number;
+  dailyOvertimeHours: number | null;
+  weeklyOvertimeHours: number | null;
+  reportCategories: string[];
+}
+
+export interface OrgUnit {
+  id: string;
+  kind: 'department' | 'location';
+  name: string;
+  memberCount: number;
 }
 
 export interface Shift {
@@ -171,3 +192,41 @@ export const SWAP_TYPE_LABELS: Record<SwapType, string> = {
   cover: 'Cover request',
   open: 'Open offer',
 };
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  requiresAck: boolean;
+  publishAt: string;
+  expiresAt: string | null;
+  createdAt: string;
+  editedAt: string | null;
+  /** Empty = every role. */
+  audienceRoles: Role[];
+  /** A manager + their direct reports; null = whole organization. */
+  audienceTeam: PersonRef | null;
+  audienceDepartment: { id: string; name: string } | null;
+  audienceLocation: { id: string; name: string } | null;
+  author: PersonRef | null;
+}
+
+export interface FeedAnnouncement extends Announcement {
+  readAt: string | null;
+  acknowledgedAt: string | null;
+  isAuthor: boolean;
+}
+
+export interface ManagedAnnouncement extends Announcement {
+  state: 'scheduled' | 'live' | 'expired';
+  stats: { recipients: number; read: number; acknowledged: number };
+}
+
+export interface Receipt extends PersonRef {
+  role: Role;
+  readAt: string | null;
+  acknowledgedAt: string | null;
+}
+
+export const ROLE_LABELS: Record<Role, string> = { owner: 'Owners', admin: 'Admins', manager: 'Managers', employee: 'Employees' };

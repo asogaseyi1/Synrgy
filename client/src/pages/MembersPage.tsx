@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, atLeast, type Role, type User } from '../api.ts';
+import { api, atLeast, type OrgUnit, type Role, type User } from '../api.ts';
 import { useMe } from '../auth.tsx';
 import { errorMessage, useApi } from '../useApi.ts';
 
@@ -15,7 +15,10 @@ export function MembersPage() {
   const members = useApi(() => api.get<{ members: User[] }>('/members'));
   const invites = useApi(() => api.get<{ invitations: Invitation[] }>('/members/invitations'));
   const [error, setError] = useState<string | null>(null);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<{ url: string; emailed: boolean } | null>(null);
+  const units = useApi(() => api.get<{ units: OrgUnit[] }>('/organization/units'));
+  const departments = units.data?.units.filter((u) => u.kind === 'department') ?? [];
+  const locations = units.data?.units.filter((u) => u.kind === 'location') ?? [];
 
   const managers = members.data?.members.filter((m) => atLeast(m.role, 'manager') && m.status === 'active') ?? [];
   const assignableRoles: Role[] = me.role === 'owner' ? ['admin', 'manager', 'employee'] : ['manager', 'employee'];
@@ -35,9 +38,9 @@ export function MembersPage() {
     const form = e.currentTarget;
     const values = Object.fromEntries(new FormData(form));
     void run(async () => {
-      const res = await api.post<{ acceptUrl: string }>('/members/invitations', values);
+      const res = await api.post<{ acceptUrl: string; emailed: boolean }>('/members/invitations', values);
       // Point the link at wherever this UI is actually served.
-      setInviteLink(res.acceptUrl.replace(/^https?:\/\/[^/]+/, window.location.origin));
+      setInviteLink({ url: res.acceptUrl.replace(/^https?:\/\/[^/]+/, window.location.origin), emailed: res.emailed });
       form.reset();
     });
   };
@@ -50,6 +53,9 @@ export function MembersPage() {
   return (
     <section>
       <h1>People</h1>
+      {units.data && units.data.units.length === 0 && (
+        <p className="muted small">Tip: add departments and locations in Settings to group people, filter payroll and target announcements.</p>
+      )}
 
       <form className="inline-form" onSubmit={invite}>
         <input name="email" type="email" placeholder="name@company.com" required />
@@ -62,7 +68,8 @@ export function MembersPage() {
       </form>
       {inviteLink && (
         <p className="notice">
-          Share this invite link (email delivery is coming later): <code>{inviteLink}</code>
+          {inviteLink.emailed ? 'Invitation emailed. You can also share the link directly: ' : "Email isn't set up, so share this invite link: "}
+          <code>{inviteLink.url}</code>
         </p>
       )}
       {error && <p className="error">{error}</p>}
@@ -91,6 +98,8 @@ export function MembersPage() {
               <th>Name</th>
               <th>Role</th>
               <th>Manager</th>
+              {departments.length > 0 && <th>Department</th>}
+              {locations.length > 0 && <th>Location</th>}
               <th title="Can read anonymous reports">Report reviewer</th>
               <th>Status</th>
             </tr>
@@ -129,6 +138,38 @@ export function MembersPage() {
                       ))}
                   </select>
                 </td>
+                {departments.length > 0 && (
+                  <td>
+                    <select
+                      value={m.departmentId ?? ''}
+                      disabled={!canEditFlags(m)}
+                      onChange={(e) => update(m.id, { departmentId: e.target.value || null })}
+                    >
+                      <option value="">—</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                )}
+                {locations.length > 0 && (
+                  <td>
+                    <select
+                      value={m.locationId ?? ''}
+                      disabled={!canEditFlags(m)}
+                      onChange={(e) => update(m.id, { locationId: e.target.value || null })}
+                    >
+                      <option value="">—</option>
+                      {locations.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                )}
                 <td>
                   <input
                     type="checkbox"

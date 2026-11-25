@@ -24,6 +24,7 @@ export function ClockPage() {
     return api.get<{ totals: { workedSeconds: number } }>(`/time/sessions?from=${from.toISOString()}`);
   });
   const upcoming = useApi(() => api.get<{ shifts: Shift[] }>('/shifts/upcoming'));
+  const news = useApi(() => api.get<{ unread: number; needsAck: number }>('/announcements/unread-count'));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const now = useNow();
@@ -60,6 +61,19 @@ export function ClockPage() {
           </div>
           <Link className="button" to={`/requests/new?session=${s.session.id}&kind=missed_clock_out`}>
             Fix this shift
+          </Link>
+        </div>
+      )}
+      {!!news.data?.needsAck && (
+        <div className="banner">
+          <div>
+            <strong>
+              {news.data.needsAck === 1 ? 'An announcement needs' : `${news.data.needsAck} announcements need`} your acknowledgement
+            </strong>
+            <div className="small">Please read and confirm policy updates from your employer.</div>
+          </div>
+          <Link className="button" to="/announcements">
+            Review now
           </Link>
         </div>
       )}

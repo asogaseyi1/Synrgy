@@ -5,6 +5,8 @@ import { config } from '../config.ts';
 import { pool, tx } from '../db.ts';
 import { audit } from '../lib/audit.ts';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { appLink } from '../lib/mailer.ts';
+import { invitationEmail } from '../lib/notify.ts';
 import { hashToken, newToken } from '../lib/tokens.ts';
 import { getUser, USER_COLUMNS } from '../lib/users.ts';
 import { atLeast, auth, requireRole, startSession } from '../middleware/auth.ts';
@@ -43,8 +45,14 @@ membersRouter.post('/invitations', requireRole('admin'), async (req, res) => {
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, role, expires_at AS "expiresAt"`,
     [me.organizationId, body.email, body.role, hashToken(token), me.userId, expiresAt],
   );
-  // No email provider yet (planned for M6), so the link is returned for the admin to share.
-  res.status(201).json({ invitation: rows[0], token, acceptUrl: `${config.clientOrigin}/invite/${token}` });
+  const acceptUrl = appLink(`/invite/${token}`);
+  const ctx = await pool.query(
+    `SELECT o.name, u.first_name || ' ' || u.last_name AS inviter FROM organizations o, users u WHERE o.id = $1 AND u.id = $2`,
+    [me.organizationId, me.userId],
+  );
+  invitationEmail(body.email, ctx.rows[0].name, ctx.rows[0].inviter, acceptUrl);
+  // The link is also returned so admins can share it directly when email isn't set up.
+  res.status(201).json({ invitation: rows[0], token, acceptUrl, emailed: config.mailProvider !== 'none' });
 });
 
 membersRouter.get('/invitations', requireRole('admin'), async (req, res) => {
@@ -70,6 +78,8 @@ const updateSchema = z
     managerId: z.uuid().nullable(),
     canReviewReports: z.boolean(),
     status: z.enum(['active', 'deactivated']),
+    departmentId: z.uuid().nullable(),
+    locationId: z.uuid().nullable(),
   })
   .partial();
 
@@ -92,6 +102,13 @@ membersRouter.patch('/:id', requireRole('admin'), async (req, res) => {
       if (!manager || !atLeast(manager.role, 'manager')) throw badRequest('Manager must be a manager or above');
     }
 
+    for (const [field, kind] of [['departmentId', 'department'], ['locationId', 'location']] as const) {
+      const unitId = body[field];
+      if (!unitId) continue;
+      const ok = await db.query('SELECT 1 FROM org_units WHERE id = $1 AND organization_id = $2 AND kind = $3', [unitId, me.organizationId, kind]);
+      if (!ok.rowCount) throw badRequest(`Unknown ${kind}`);
+    }
+
     const sets: string[] = [];
     const values: unknown[] = [];
     const set = (col: string, val: unknown) => {
@@ -102,6 +119,8 @@ membersRouter.patch('/:id', requireRole('admin'), async (req, res) => {
     if (body.managerId !== undefined) set('manager_id', body.managerId);
     if (body.canReviewReports !== undefined) set('can_review_reports', body.canReviewReports);
     if (body.status !== undefined) set('status', body.status);
+    if (body.departmentId !== undefined) set('department_id', body.departmentId);
+    if (body.locationId !== undefined) set('location_id', body.locationId);
     if (!sets.length) return target;
 
     values.push(me.organizationId, id);
